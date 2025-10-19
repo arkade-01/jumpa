@@ -115,10 +115,10 @@ export class AjoCommand extends BaseCommand {
         return;
       }
 
-      if (args.length < 2) {
+      if (args.length < 3) {
         await ctx.reply(
-          "❌ Usage: `/ajo create <name> <max_members> [consensus_threshold]`\n\n" +
-            "**Example:** `/ajo create CryptoCrew 10 67`",
+          "❌ Usage: `/ajo create <name> <max_members> <entry_capital> [consensus_threshold]`\n\n" +
+            "**Example:** `/ajo create CryptoCrew 10 100 67`",
           { parse_mode: "Markdown" }
         );
         return;
@@ -127,7 +127,8 @@ export class AjoCommand extends BaseCommand {
       // Parse arguments
       const name = args[0];
       const maxMembers = parseInt(args[1]);
-      const consensusThreshold = args[2] ? parseInt(args[2]) : 67;
+      const entryCapital = parseInt(args[2]);
+      const consensusThreshold = args[3] ? parseInt(args[3]) : 67;
 
       // Validate and sanitize input
       const nameValidation = validateAndSanitizeGroupName(name);
@@ -138,7 +139,7 @@ export class AjoCommand extends BaseCommand {
 
       const validation = validateAjoCreation({
         name: nameValidation.sanitized,
-        initial_capital: 0, // Will be updated when members contribute
+        initial_capital: entryCapital,
         max_members: maxMembers,
         consensus_threshold: consensusThreshold,
       });
@@ -156,23 +157,12 @@ export class AjoCommand extends BaseCommand {
         return;
       }
 
-      // Check if this chat already has an ajo group
-      const existingGroup = await getAjoByChatId(chatId);
-      if (existingGroup) {
-        await ctx.reply(
-          `❌ This chat already has an Ajo group: **${existingGroup.name}**\n\n` +
-            `Use \`/ajo info\` to view group details.`,
-          { parse_mode: "Markdown" }
-        );
-        return;
-      }
-
       // Create the ajo group
       const ajoGroup = await createAjo({
         name: nameValidation.sanitized,
         creator_id: userId,
         telegram_chat_id: chatId,
-        initial_capital: 0,
+        initial_capital: entryCapital,
         max_members: maxMembers,
         consensus_threshold: consensusThreshold,
       });
@@ -182,6 +172,7 @@ export class AjoCommand extends BaseCommand {
 
 🏠 **Name:** ${ajoGroup.name}
 👥 **Max Members:** ${ajoGroup.max_members}
+💰 **Entry Capital:** ${ajoGroup.initial_capital} SOL
 🗳️ **Consensus:** ${ajoGroup.consensus_threshold}%
 📊 **Status:** Active
 
@@ -230,20 +221,46 @@ export class AjoCommand extends BaseCommand {
         return;
       }
 
-      // Check if user is registered
+      // Auto-register user if not exists (creates wallet automatically)
+      let user;
       try {
-        await getUser(userId, username);
+        user = await getUser(userId, username);
+        
+        // If this is a new user, send welcome message
+        if (user && !user.last_seen) {
+          await ctx.reply(
+            `👋 Welcome! I've created a wallet for you.\n\n` +
+            `🔑 **Wallet:** \`${user.wallet_address}\`\n\n` +
+            `⚠️ **Important:** You'll need SOL to join groups. Use \`/fund_wallet\` for instructions.`,
+            { parse_mode: "Markdown" }
+          );
+        }
       } catch (error) {
-        await ctx.reply("❌ Please register first using /start");
+        await ctx.reply("❌ Failed to create wallet. Please try /start first.");
         return;
       }
 
-      // Join the ajo group
-      const ajoGroup = await joinAjo({
-        group_id: groupId,
-        user_id: userId,
-        contribution: 0, // Will be updated when they contribute
-      });
+      // Send initial message to user
+      const processingMessage = await ctx.reply(
+        "🔄 **Joining group on blockchain...**\n\n" +
+        "⏳ This may take up to 2 minutes. Please wait...",
+        { parse_mode: "Markdown" }
+      );
+
+      try {
+        // Join the ajo group
+        const ajoGroup = await joinAjo({
+          group_id: groupId,
+          user_id: userId,
+          contribution: 0, // Will be updated when they contribute
+        });
+
+        // Delete the processing message
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat!.id, processingMessage.message_id);
+        } catch (deleteError) {
+          console.log("Could not delete processing message:", deleteError);
+        }
 
       const successMessage = `
 ✅ **Successfully Joined Ajo Group!**
@@ -263,7 +280,25 @@ export class AjoCommand extends BaseCommand {
 • \`/ajo balance\` - Check your share
       `;
 
-      await ctx.reply(successMessage, { parse_mode: "Markdown" });
+        await ctx.reply(successMessage, { parse_mode: "Markdown" });
+      } catch (joinError) {
+        // Delete the processing message
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat!.id, processingMessage.message_id);
+        } catch (deleteError) {
+          console.log("Could not delete processing message:", deleteError);
+        }
+
+        console.error("Join ajo error:", joinError);
+        let errorMessage = joinError instanceof Error ? joinError.message : "Unknown error";
+        
+        // Provide helpful message for RPC errors
+        if (errorMessage.includes('fetch failed') || errorMessage.includes('failed to get info about account')) {
+          errorMessage = "Network connection issue. The RPC endpoint is temporarily unavailable. Please try again in a few moments.";
+        }
+        
+        await ctx.reply(`❌ Failed to join Ajo group: ${errorMessage}`);
+      }
     } catch (error) {
       console.error("Join ajo error:", error);
       const errorMessage =
@@ -300,7 +335,7 @@ export class AjoCommand extends BaseCommand {
       const infoMessage = `
 📊 **Ajo Group: ${ajoGroup.name}**
 
-💰 **Capital:** $${ajoGroup.current_balance} USDC
+💰 **Capital:** ${ajoGroup.current_balance} SOL
 👥 **Members:** ${ajoGroup.members.length}/${ajoGroup.max_members}
 🗳️ **Consensus:** ${ajoGroup.consensus_threshold}%
 📈 **Status:** ${ajoGroup.status === "active" ? "🟢 Active" : "🔴 Ended"}
@@ -361,7 +396,7 @@ export class AjoCommand extends BaseCommand {
         } (${sharePercentage}%)\n`;
       });
 
-      membersMessage += `\n**Total Balance:** $${ajoGroup.current_balance} USDC`;
+      membersMessage += `\n**Total Balance:** ${ajoGroup.current_balance} SOL`;
 
       await ctx.reply(membersMessage, { parse_mode: "Markdown" });
     } catch (error) {
@@ -466,7 +501,7 @@ export class AjoCommand extends BaseCommand {
 🏆 **Rank:** #${memberSummary.rank}
 💎 **Role:** ${memberSummary.is_trader ? "🛠️ Trader" : "👤 Member"}
 
-💰 **Group Balance:** $${ajoGroup.current_balance} USDC
+💰 **Group Balance:** ${ajoGroup.current_balance} SOL
 👥 **Total Members:** ${ajoGroup.members.length}
 
 💡 **Potential Profit Share:** $${memberSummary.potential_profit_share}
@@ -508,7 +543,7 @@ export class AjoCommand extends BaseCommand {
           const role = isTrader ? "🛠️ Trader" : "👤 Member";
 
           groupsMessage += `${index + 1}. **${group.name}**\n`;
-          groupsMessage += `   ${role} | $${group.current_balance} USDC\n`;
+          groupsMessage += `   ${role} | ${group.current_balance} SOL\n`;
           groupsMessage += `   ${group.members.length}/${group.max_members} members\n`;
           groupsMessage += `   ID: \`${group._id}\`\n\n`;
         });

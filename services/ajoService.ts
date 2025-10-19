@@ -1,6 +1,7 @@
 import AjoGroup from "../models/ajoGroup";
 import User from "../models/user";
 import { Types } from "mongoose";
+import * as solanaService from "./solanaService";
 
 export interface CreateAjoParams {
   name: string;
@@ -36,7 +37,7 @@ export interface VoteParams {
 }
 
 /**
- * Create a new Ajo group
+ * Create a new Ajo group (both on-chain and in database)
  */
 export async function createAjo(params: CreateAjoParams) {
   try {
@@ -68,7 +69,50 @@ export async function createAjo(params: CreateAjoParams) {
       throw new Error("This chat already has an Ajo group");
     }
 
-    // Create the ajo group
+    // Initialize group on-chain first
+    console.log("Initializing group on-chain...");
+    let onChainResult;
+    
+    try {
+      onChainResult = await solanaService.initializeGroup({
+        telegramId: params.creator_id,
+        groupName: params.name,
+        adminName: creator.username,
+        entryCapital: params.initial_capital,
+        voteThreshold: consensus_threshold,
+      });
+      console.log(`On-chain group created: ${onChainResult.groupPDA}`);
+    } catch (error) {
+      console.error("Failed to create group on-chain:", error);
+      
+      // Check if the group was actually created despite the error
+      const { checkGroupExists, deriveGroupPDA } = await import("./solanaService");
+      const { decryptPrivateKey } = await import("../utils/encryption");
+      const { Keypair } = await import("@solana/web3.js");
+      
+      try {
+        const privateKeyHex = decryptPrivateKey(creator.private_key);
+        const keypair = Keypair.fromSecretKey(Buffer.from(privateKeyHex, 'hex'));
+        const signer = keypair.publicKey;
+        
+        const groupExists = await checkGroupExists(params.name, signer);
+        if (groupExists) {
+          const [groupPDA] = deriveGroupPDA(params.name, signer);
+          throw new Error(
+            `Group "${params.name}" already exists on-chain at ${groupPDA.toBase58()}. ` +
+            `The transaction may have succeeded despite the error. ` +
+            `Use /recover_group to sync it with the database.`
+          );
+        }
+      } catch (checkError) {
+        console.error("Error checking group existence:", checkError);
+      }
+      
+      // Re-throw the original error
+      throw new Error(`Failed to create group on-chain: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    // Create the ajo group in database
     const ajoGroup = new AjoGroup({
       name: params.name,
       creator_id: params.creator_id,
@@ -88,11 +132,16 @@ export async function createAjo(params: CreateAjoParams) {
       polls: [],
       trades: [],
       current_balance: 0,
+      // Store on-chain addresses
+      onchain_group_address: onChainResult.groupPDA,
+      onchain_tx_signature: onChainResult.signature,
     });
 
     await ajoGroup.save();
 
     console.log(`Ajo group created: ${params.name} (ID: ${ajoGroup._id})`);
+    console.log(`On-chain address: ${onChainResult.groupPDA}`);
+    
     return ajoGroup;
   } catch (error) {
     console.error("Error creating ajo group:", error);
@@ -101,7 +150,7 @@ export async function createAjo(params: CreateAjoParams) {
 }
 
 /**
- * Join an existing Ajo group
+ * Join an existing Ajo group (both on-chain and in database)
  */
 export async function joinAjo(params: JoinAjoParams) {
   try {
@@ -135,7 +184,42 @@ export async function joinAjo(params: JoinAjoParams) {
       throw new Error("This Ajo group is full");
     }
 
-    // Add user as member
+    // Get the group owner
+    const owner = await User.findOne({ telegram_id: ajoGroup.creator_id });
+    if (!owner) {
+      throw new Error("Group owner not found");
+    }
+
+    // Join group on-chain
+    if (ajoGroup.onchain_group_address) {
+      console.log("Joining group on-chain...");
+      let onChainResult;
+      let alreadyMemberOnChain = false;
+      
+      try {
+        onChainResult = await solanaService.joinGroup({
+          telegramId: params.user_id,
+          groupPDA: ajoGroup.onchain_group_address,
+          ownerPubkey: owner.wallet_address,
+          memberName: user.username,
+        });
+        console.log(`On-chain join successful: ${onChainResult.signature}`);
+      } catch (error) {
+        console.error("Failed to join group on-chain:", error);
+        
+        // Check if error is because user is already a member
+        const errorMessage = error instanceof Error ? error.message : '';
+        if (errorMessage.includes('already a member') || errorMessage.includes('Member profile exists')) {
+          console.log('User is already a member on-chain, will update database only');
+          alreadyMemberOnChain = true;
+        } else {
+          // For other errors, re-throw
+          throw new Error(`Failed to join group on-chain: ${errorMessage}`);
+        }
+      }
+    }
+
+    // Add user as member in database
     ajoGroup.members.push({
       user_id: params.user_id,
       role: "member", // New members start as regular members
@@ -332,7 +416,262 @@ export async function promoteToTrader(group_id: string, user_id: number) {
 }
 
 /**
- * Remove member from ajo group
+ * Add trader on-chain
+ */
+export async function addTraderOnChain(group_id: string, trader_telegram_id: number, admin_telegram_id: number) {
+  try {
+    const ajoGroup = await AjoGroup.findById(group_id);
+    if (!ajoGroup) {
+      throw new Error("Ajo group not found");
+    }
+
+    const trader = await User.findOne({ telegram_id: trader_telegram_id });
+    if (!trader) {
+      throw new Error("Trader not found");
+    }
+
+    if (ajoGroup.onchain_group_address) {
+      console.log("Adding trader on-chain...");
+      
+      try {
+        const result = await solanaService.addTrader({
+          telegramId: admin_telegram_id,
+          groupPDA: ajoGroup.onchain_group_address,
+          traderPubkey: trader.wallet_address,
+        });
+        console.log(`Trader added on-chain: ${result.signature}`);
+        return result;
+      } catch (error) {
+        console.error("Failed to add trader on-chain:", error);
+        
+        // Check if error is because trader is already added
+        const errorMessage = error instanceof Error ? error.message : '';
+        if (
+          errorMessage.includes('already a trader') || 
+          errorMessage.includes('Trader already exists') ||
+          errorMessage.includes('AlreadyJoined') ||
+          errorMessage.includes('Error Number: 6007')
+        ) {
+          console.log('Trader is already added on-chain, continuing with database update');
+          return { success: true, signature: 'already_exists' };
+        }
+        
+        // Re-throw other errors
+        throw new Error(`Failed to add trader on-chain: ${errorMessage}`);
+      }
+    }
+
+    throw new Error("Group has no on-chain address");
+  } catch (error) {
+    console.error("Error adding trader on-chain:", error);
+    throw error;
+  }
+}
+
+/**
+ * Remove trader on-chain
+ */
+export async function removeTraderOnChain(group_id: string, trader_telegram_id: number, admin_telegram_id: number) {
+  try {
+    const ajoGroup = await AjoGroup.findById(group_id);
+    if (!ajoGroup) {
+      throw new Error("Ajo group not found");
+    }
+
+    const trader = await User.findOne({ telegram_id: trader_telegram_id });
+    if (!trader) {
+      throw new Error("Trader not found");
+    }
+
+    if (ajoGroup.onchain_group_address) {
+      console.log("Removing trader on-chain...");
+      const result = await solanaService.removeTrader({
+        telegramId: admin_telegram_id,
+        groupPDA: ajoGroup.onchain_group_address,
+        traderPubkey: trader.wallet_address,
+      });
+      console.log(`Trader removed on-chain: ${result.signature}`);
+      return result;
+    }
+
+    throw new Error("Group has no on-chain address");
+  } catch (error) {
+    console.error("Error removing trader on-chain:", error);
+    throw error;
+  }
+}
+
+/**
+ * Create trade proposal on-chain
+ */
+export interface CreateTradeProposalParams {
+  group_id: string;
+  proposer_telegram_id: number;
+  name: string;
+  token_mint: string;
+  token_account: string;
+  amount: number;
+  buy: boolean; // true for buy, false for sell
+}
+
+export async function createTradeProposal(params: CreateTradeProposalParams) {
+  try {
+    const ajoGroup = await AjoGroup.findById(params.group_id);
+    if (!ajoGroup) {
+      throw new Error("Ajo group not found");
+    }
+
+    const proposer = await User.findOne({ telegram_id: params.proposer_telegram_id });
+    if (!proposer) {
+      throw new Error("Proposer not found");
+    }
+
+    const owner = await User.findOne({ telegram_id: ajoGroup.creator_id });
+    if (!owner) {
+      throw new Error("Group owner not found");
+    }
+
+    // Check if user is a trader
+    const isTrader = await isUserTrader(params.group_id, params.proposer_telegram_id);
+    if (!isTrader) {
+      throw new Error("Only traders can create trade proposals");
+    }
+
+    if (!ajoGroup.onchain_group_address) {
+      throw new Error("Group has no on-chain address");
+    }
+
+    // Generate nonce (using timestamp + random number)
+    const nonce = Date.now() + Math.floor(Math.random() * 1000);
+
+    console.log("Creating trade proposal on-chain...");
+    const result = await solanaService.proposeTrade({
+      telegramId: params.proposer_telegram_id,
+      groupPDA: ajoGroup.onchain_group_address,
+      ownerPubkey: owner.wallet_address,
+      name: params.name,
+      nonce: nonce,
+      amount: params.amount,
+      buy: params.buy,
+      tokenAccount: params.token_account,
+      mintAccount: params.token_mint,
+    });
+
+    console.log(`Trade proposal created on-chain: ${result.proposalPDA}`);
+
+    // Store proposal info in database for quick access
+    ajoGroup.polls.push({
+      id: result.proposalPDA,
+      creator_id: params.proposer_telegram_id,
+      type: "trade",
+      title: params.name,
+      token_address: params.token_mint,
+      token_symbol: params.name.split(" ")[0], // Extract token symbol from name
+      amount: params.amount,
+      status: "open",
+      votes: [],
+      created_at: new Date(),
+      expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000), // 48 hours
+    });
+
+    await ajoGroup.save();
+
+    return {
+      success: true,
+      proposalPDA: result.proposalPDA,
+      signature: result.signature,
+      group: ajoGroup,
+    };
+  } catch (error) {
+    console.error("Error creating trade proposal:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch on-chain group state and sync with database
+ */
+export async function syncGroupFromChain(group_id: string) {
+  try {
+    const ajoGroup = await AjoGroup.findById(group_id);
+    if (!ajoGroup) {
+      throw new Error("Ajo group not found");
+    }
+
+    if (!ajoGroup.onchain_group_address) {
+      throw new Error("Group has no on-chain address");
+    }
+
+    console.log("Fetching on-chain group state...");
+    const onChainData = await solanaService.fetchGroupAccount(ajoGroup.onchain_group_address);
+
+    console.log("On-chain group data:", onChainData);
+
+    // Sync trader roles from on-chain to database
+    const onChainTraders = new Set(onChainData.traders);
+    let syncedCount = 0;
+    
+    for (const member of ajoGroup.members) {
+      const user = await User.findOne({ telegram_id: member.user_id });
+      if (!user) continue;
+      
+      const isTraderOnChain = onChainTraders.has(user.wallet_address);
+      const isTraderInDB = member.role === "trader";
+      
+      // Fix mismatch
+      if (isTraderOnChain && !isTraderInDB) {
+        member.role = "trader";
+        syncedCount++;
+        console.log(`Synced user ${member.user_id} (${user.username}): promoted to trader`);
+      } else if (!isTraderOnChain && isTraderInDB) {
+        member.role = "member";
+        syncedCount++;
+        console.log(`Synced user ${member.user_id} (${user.username}): demoted to member`);
+      }
+    }
+    
+    if (syncedCount > 0) {
+      await ajoGroup.save();
+      console.log(`Synced ${syncedCount} member roles from on-chain state`);
+    }
+
+    return {
+      database: ajoGroup,
+      onChain: onChainData,
+      syncedRoles: syncedCount,
+    };
+  } catch (error) {
+    console.error("Error syncing group from chain:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch all proposals for a group from on-chain
+ */
+export async function fetchGroupProposals(group_id: string) {
+  try {
+    const ajoGroup = await AjoGroup.findById(group_id);
+    if (!ajoGroup) {
+      throw new Error("Ajo group not found");
+    }
+
+    if (!ajoGroup.onchain_group_address) {
+      throw new Error("Group has no on-chain address");
+    }
+
+    console.log("Fetching on-chain proposals...");
+    const proposals = await solanaService.fetchAllGroupProposals(ajoGroup.onchain_group_address);
+
+    return proposals;
+  } catch (error) {
+    console.error("Error fetching group proposals:", error);
+    throw error;
+  }
+}
+
+/**
+ * Remove member from ajo group (exit on-chain and remove from database)
  */
 export async function removeMember(group_id: string, user_id: number) {
   try {
@@ -351,6 +690,24 @@ export async function removeMember(group_id: string, user_id: number) {
     );
     if (memberIndex === -1) {
       throw new Error("User is not a member of this group");
+    }
+
+    // Exit group on-chain
+    if (ajoGroup.onchain_group_address) {
+      const owner = await User.findOne({ telegram_id: ajoGroup.creator_id });
+      if (owner) {
+        console.log("Exiting group on-chain...");
+        try {
+          await solanaService.exitGroup({
+            telegramId: user_id,
+            groupName: ajoGroup.name,
+            ownerPubkey: owner.wallet_address,
+          });
+        } catch (error) {
+          console.error("On-chain exit failed:", error);
+          // Continue with off-chain removal even if on-chain fails
+        }
+      }
     }
 
     // Remove member and update balance

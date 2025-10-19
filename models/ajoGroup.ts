@@ -152,6 +152,15 @@ const ajoGroupSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // On-chain data
+    onchain_group_address: {
+      type: String,
+      required: false,
+    },
+    onchain_tx_signature: {
+      type: String,
+      required: false,
+    },
     created_at: {
       type: Date,
       default: Date.now,

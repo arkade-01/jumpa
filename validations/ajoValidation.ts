@@ -31,8 +31,8 @@ export function validateAjoCreation(params: {
   }
 
   // Validate initial capital
-  if (params.initial_capital < 0) {
-    errors.push("Initial capital must be non-negative");
+  if (params.initial_capital <= 0) {
+    errors.push("Initial capital must be greater than 0");
   }
 
   // Validate max members
@@ -142,9 +142,9 @@ export function validateContribution(contribution: number): {
     errors.push("Contribution must be non-negative");
   }
 
-  // Add reasonable upper limit (e.g., 1 million USDC)
+  // Add reasonable upper limit (e.g., 1 million SOL)
   if (contribution > 1000000) {
-    errors.push("Contribution cannot exceed 1,000,000 USDC");
+    errors.push("Contribution cannot exceed 1,000,000 SOL");
   }
 
   return {

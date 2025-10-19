@@ -2,14 +2,30 @@ import { Telegraf, Context } from "telegraf";
 import { BaseCommand } from "./BaseCommand";
 import { StartCommand } from "./StartCommand";
 import { HelpCommand } from "./HelpCommand";
-import { PingCommand } from "./PingCommand";
-import { InfoCommand } from "./InfoCommand";
 import { WalletCommand } from "./WalletCommand";
 import { AjoCommand } from "./AjoCommand";
 import { PollCommand } from "./PollCommand";
 import { CreateGroupCommand } from "./CreateGroupCommand";
 import { AddMemberCommand } from "./AddMemberCommand";
 import { GroupCommand } from "./GroupCommand";
+import { AjoInfoCommand } from "./AjoInfoCommand";
+import { AjoMembersCommand } from "./AjoMembersCommand";
+import { AjoPollsCommand } from "./AjoPollsCommand";
+import { AjoBalanceCommand } from "./AjoBalanceCommand";
+import { PollTradeCommand } from "./PollTradeCommand";
+import { PollEndCommand } from "./PollEndCommand";
+import { PollResultsCommand } from "./PollResultsCommand";
+import { PollExecuteCommand } from "./PollExecuteCommand";
+import { ProposeTradeCommand } from "./ProposeTradeCommand";
+import { SyncGroupCommand } from "./SyncGroupCommand";
+import { FetchProposalsCommand } from "./FetchProposalsCommand";
+import { CheckGroupCommand } from "./CheckGroupCommand";
+import { RecoverGroupCommand } from "./RecoverGroupCommand";
+import { FundWalletCommand } from "./FundWalletCommand";
+import { PromoteTraderCommand } from "./PromoteTraderCommand";
+import { VoteCommand } from "./VoteCommand";
+import { LeaveGroupCommand } from "./LeaveGroupCommand";
+import { DemoteTraderCommand } from "./DemoteTraderCommand";
 import { WalletCallbackHandlers } from "./callbackHandlers/WalletCallbackHandlers";
 import { StartCallbackHandlers } from "./callbackHandlers/StartCallbackHandlers";
 import { AjoCallbackHandlers } from "./callbackHandlers/AjoCallbackHandlers";
@@ -28,14 +44,30 @@ export class CommandManager {
     const commandInstances = [
       new StartCommand(),
       new HelpCommand(),
-      new PingCommand(),
-      new InfoCommand(),
       new WalletCommand(),
       new AjoCommand(),
       new PollCommand(),
       new CreateGroupCommand(),
       new AddMemberCommand(),
       new GroupCommand(),
+      new AjoInfoCommand(),
+      new AjoMembersCommand(),
+      new AjoPollsCommand(),
+      new AjoBalanceCommand(),
+      new PollTradeCommand(),
+      new PollEndCommand(),
+      new PollResultsCommand(),
+      new PollExecuteCommand(),
+      new ProposeTradeCommand(),
+      new SyncGroupCommand(),
+      new FetchProposalsCommand(),
+      new CheckGroupCommand(),
+      new RecoverGroupCommand(),
+      new FundWalletCommand(),
+      new PromoteTraderCommand(),
+      new VoteCommand(),
+      new LeaveGroupCommand(),
+      new DemoteTraderCommand(),
     ];
 
     commandInstances.forEach((command) => {
@@ -79,6 +111,7 @@ export class CommandManager {
     this.bot.action("join_ajo", StartCallbackHandlers.handleJoinAjo);
     this.bot.action("show_help", StartCallbackHandlers.handleShowHelp);
     this.bot.action("show_about", StartCallbackHandlers.handleShowAbout);
+    this.bot.action("back_to_menu", StartCallbackHandlers.handleBackToMenu);
 
     // Register callback handlers for ajo command
     this.bot.action("ajo_info", AjoCallbackHandlers.handleAjoInfo);

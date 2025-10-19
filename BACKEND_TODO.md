@@ -9,7 +9,7 @@ This document outlines the complete backend development roadmap for the Jumpa Aj
 Create a Telegram-first collaborative trading bot where users can:
 
 - Form "Ajo" groups (traditional savings groups)
-- Pool USDC for collective trading
+- Pool SOL for collective trading
 - Vote on trading decisions
 - Share profits based on contributions
 
@@ -215,7 +215,7 @@ Create a Telegram-first collaborative trading bot where users can:
   - Allow promotion to trader via governance
 
 - [ ] **Member contribution tracking**
-  - Track USDC contributions per member
+  - Track SOL contributions per member
   - Calculate profit share percentage
   - Handle partial contributions
 
@@ -277,7 +277,7 @@ Create a Telegram-first collaborative trading bot where users can:
 
   ```
   📊 Ajo Group: CryptoCrew
-  💰 Capital: $1,000 USDC
+  💰 Capital: $1,000 SOL
   👥 Members: 7/10
   🗳️ Consensus: 67%
   📈 Status: Active
@@ -299,13 +299,13 @@ Create a Telegram-first collaborative trading bot where users can:
   📈 Recent Trades:
   1. BONK - 500 tokens @ $0.001
   2. SOL - 2 tokens @ $95
-  3. USDC - 1000 @ $1.00
+  3. SOL - 1000 @ $1.00
   ```
 
 - [ ] **`/balance` handler**
 
   ```
-  💰 Vault Balance: $1,250 USDC
+  💰 Vault Balance: $1,250 SOL
   👤 Your Contribution: $200 (16%)
   📊 Your Share: 16% of profits
   ```
@@ -323,7 +323,7 @@ Create a Telegram-first collaborative trading bot where users can:
   🗳️ New Trade Proposal:
   Token: BONK
   Amount: 500 tokens
-  Estimated Cost: $500 USDC
+  Estimated Cost: $500 SOL
 
   Vote with: /vote <poll_id> yes/no
   ```
@@ -359,12 +359,12 @@ Create a Telegram-first collaborative trading bot where users can:
 
 - [ ] **Transaction builder**
 
-  - Build USDC transfer transactions
+  - Build SOL transfer transactions
   - Build token swap transactions
   - Handle transaction fees
 
 - [ ] **Balance checking**
-  - Check USDC balances
+  - Check SOL balances
   - Check token balances
   - Cache balance data
 

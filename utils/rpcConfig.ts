@@ -9,7 +9,21 @@ export const getSolanaConnection = (): Connection => {
     connection = new Connection(api_url, {
       commitment: "confirmed",
       confirmTransactionInitialTimeout: 60000,
+      disableRetryOnRateLimit: false,
     });
+    
+    // Suppress WebSocket error logging (these are non-critical during transaction confirmation)
+    try {
+      const rpcWebSocket = (connection as any)._rpcWebSocket;
+      if (rpcWebSocket) {
+        // Override the internal error handler to suppress logging
+        rpcWebSocket.on('error', () => {
+          // Silently ignore WebSocket errors - transactions use HTTP fallback
+        });
+      }
+    } catch (e) {
+      // If we can't suppress the errors, that's okay
+    }
   }
   return connection;
 };

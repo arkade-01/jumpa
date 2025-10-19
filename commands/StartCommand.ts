@@ -24,14 +24,17 @@ export class StartCommand extends BaseCommand {
       const user = await getUser(telegramId, username);
 
       if (user) {
-        const welcomeMessage = `
-👋 Welcome to Jumpa Ajo Bot, ${username}!
+        const firstName = ctx.from?.first_name || username;
+        const welcomeMessage = `👋 Welcome to Jumpa Ajo Bot, ${firstName}!
 
-🔑 Your Wallet: \`${user.wallet_address}\`
-💰 Balance: ${user.user_balance} SOL
+🔑 *Your Wallet:*
+\`${user.wallet_address}\`
+
+💰 *Balance:* ${user.user_balance} SOL
 
 🚀 Ready to start collaborative trading!
-        `;
+
+_Tap the wallet address above to copy it_`;
 
         // Create inline keyboard for quick actions
         const keyboard = Markup.inlineKeyboard([
@@ -42,6 +45,9 @@ export class StartCommand extends BaseCommand {
           [
             Markup.button.callback("🏠 Create Ajo Group", "create_ajo"),
             Markup.button.callback("👥 Join Ajo Group", "join_ajo"),
+          ],
+          [
+            Markup.button.callback("📊 Ajo Info", "ajo_info"),
           ],
           [
             Markup.button.callback("❓ Help & Commands", "show_help"),

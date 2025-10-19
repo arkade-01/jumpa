@@ -19,7 +19,7 @@ export async function updateGroupBalance(group_id: string) {
     ajoGroup.current_balance = totalBalance;
     await ajoGroup.save();
 
-    console.log(`Group balance updated: ${totalBalance} USDC`);
+    console.log(`Group balance updated: ${totalBalance} SOL`);
     return totalBalance;
   } catch (error) {
     console.error("Error updating group balance:", error);
@@ -219,7 +219,7 @@ export async function trackMemberContribution(
     await updateGroupBalance(group_id);
 
     console.log(
-      `Contribution tracked: User ${user_id} contributed ${contribution} USDC to group ${group_id}`
+      `Contribution tracked: User ${user_id} contributed ${contribution} SOL to group ${group_id}`
     );
     return ajoGroup;
   } catch (error) {
@@ -279,10 +279,10 @@ export function validateContributionAmount(amount: number): {
   }
 
   if (amount > 1000000) {
-    errors.push("Contribution amount cannot exceed 1,000,000 USDC");
+    errors.push("Contribution amount cannot exceed 1,000,000 SOL");
   }
 
-  // Check for reasonable decimal places (max 6 for USDC)
+  // Check for reasonable decimal places (max 6 for SOL)
   const decimalPlaces = (amount.toString().split(".")[1] || "").length;
   if (decimalPlaces > 6) {
     errors.push("Contribution amount cannot have more than 6 decimal places");
@@ -304,7 +304,7 @@ export function calculateMinimumMeaningfulContribution(ajoGroup: any): number {
   // Minimum contribution to get at least 1% share
   const minimumForOnePercent = totalBalance * 0.01;
 
-  // Or minimum of $10 USDC
+  // Or minimum of $10 SOL
   const minimumAbsolute = 10;
 
   return Math.max(minimumForOnePercent, minimumAbsolute);

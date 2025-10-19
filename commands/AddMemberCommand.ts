@@ -43,20 +43,46 @@ export class AddMemberCommand extends BaseCommand {
         return;
       }
 
-      // Check if user is registered
+      // Auto-register user if not exists (creates wallet automatically)
+      let user;
       try {
-        await getUser(userId, username);
+        user = await getUser(userId, username);
+        
+        // If this is a new user, send welcome message
+        if (user && !user.last_seen) {
+          await ctx.reply(
+            `👋 Welcome! I've created a wallet for you.\n\n` +
+            `🔑 **Wallet:** \`${user.wallet_address}\`\n\n` +
+            `⚠️ **Important:** You'll need SOL to join groups. Use \`/fund_wallet\` for instructions.`,
+            { parse_mode: "Markdown" }
+          );
+        }
       } catch (error) {
-        await ctx.reply("❌ Please register first using /start");
+        await ctx.reply("❌ Failed to create wallet. Please try /start first.");
         return;
       }
 
-      // Join the ajo group
-      const ajoGroup = await joinAjo({
-        group_id: groupId,
-        user_id: userId,
-        contribution: 0, // Will be updated when they contribute
-      });
+      // Send initial message to user
+      const processingMessage = await ctx.reply(
+        "🔄 **Joining group on blockchain...**\n\n" +
+        "⏳ This may take up to 2 minutes. Please wait...",
+        { parse_mode: "Markdown" }
+      );
+
+      try {
+        // Join the ajo group
+        const ajoGroup = await joinAjo({
+          group_id: groupId,
+          user_id: userId,
+          contribution: 0, // Will be updated when they contribute
+        });
+
+        // Delete the processing message
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat!.id, processingMessage.message_id);
+        } catch (deleteError) {
+          console.log("Could not delete processing message:", deleteError);
+        }
 
       const successMessage = `
 ✅ **Successfully Joined Ajo Group!**
@@ -77,7 +103,25 @@ export class AddMemberCommand extends BaseCommand {
 • \`/ajo members\` - See all members
       `;
 
-      await ctx.reply(successMessage, { parse_mode: "Markdown" });
+        await ctx.reply(successMessage, { parse_mode: "Markdown" });
+      } catch (joinError) {
+        // Delete the processing message
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat!.id, processingMessage.message_id);
+        } catch (deleteError) {
+          console.log("Could not delete processing message:", deleteError);
+        }
+
+        console.error("Add member error:", joinError);
+        let errorMessage = joinError instanceof Error ? joinError.message : "Unknown error";
+        
+        // Provide helpful message for RPC errors
+        if (errorMessage.includes('fetch failed') || errorMessage.includes('failed to get info about account')) {
+          errorMessage = "Network connection issue. The RPC endpoint is temporarily unavailable. Please try again in a few moments.";
+        }
+        
+        await ctx.reply(`❌ Failed to join Ajo group: ${errorMessage}`);
+      }
     } catch (error) {
       console.error("Add member error:", error);
       const errorMessage =

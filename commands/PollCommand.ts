@@ -166,7 +166,7 @@ export class PollCommand extends BaseCommand {
 🗳️ **New Trade Poll Created!**
 
 🔄 **Trade:** Buy ${amount} ${tokenSymbol}
-💰 **Estimated Cost:** $${amount * 0.001} USDC *(estimated)*
+💰 **Estimated Cost:** $${amount * 0.001} SOL *(estimated)*
 ⏰ **Expires:** ${new Date(poll.expires_at).toLocaleString()}
 
 **Poll ID:** \`${poll.id}\`
@@ -233,7 +233,7 @@ export class PollCommand extends BaseCommand {
 🗳️ **New End Ajo Poll Created!**
 
 🏁 **Action:** End Ajo Group and Distribute Profits
-💰 **Current Balance:** $${ajoGroup.current_balance} USDC
+💰 **Current Balance:** ${ajoGroup.current_balance} SOL
 ⏰ **Expires:** ${new Date(poll.expires_at).toLocaleString()}
 
 **Poll ID:** \`${poll.id}\`
@@ -403,8 +403,8 @@ export class PollCommand extends BaseCommand {
 
 **Consensus:**
 🎯 **Threshold:** ${results.consensusThreshold}%
-📊 **Yes Power:** ${results.yesVotingPower.toFixed(2)} USDC
-📊 **Total Power:** ${results.totalVotingPower.toFixed(2)} USDC
+📊 **Yes Power:** ${results.yesVotingPower.toFixed(2)} SOL
+📊 **Total Power:** ${results.totalVotingPower.toFixed(2)} SOL
 ${
   results.consensusReached
     ? "✅ **Consensus Reached!**"

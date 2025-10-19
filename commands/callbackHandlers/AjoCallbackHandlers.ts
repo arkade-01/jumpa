@@ -51,17 +51,6 @@ export class AjoCallbackHandlers {
         return;
       }
 
-      // Check if this chat already has an ajo group
-      const existingGroup = await getAjoByChatId(chatId);
-      if (existingGroup) {
-        await ctx.reply(
-          `❌ This chat already has an Ajo group: **${existingGroup.name}**\n\n` +
-            `Use /ajo_info to view group details.`,
-          { parse_mode: "Markdown" }
-        );
-        return;
-      }
-
       const createAjoMessage = `
 🏠 **Create Ajo Group**
 
@@ -192,7 +181,7 @@ An Ajo is a traditional savings group where members:
       const infoMessage = `
 📊 **Ajo Group: ${ajoGroup.name}**
 
-💰 **Capital:** $${ajoGroup.current_balance} USDC
+💰 **Capital:** ${ajoGroup.current_balance} SOL
 👥 **Members:** ${ajoGroup.members.length}/${ajoGroup.max_members}
 🗳️ **Consensus:** ${ajoGroup.consensus_threshold}%
 📈 **Status:** ${ajoGroup.status === "active" ? "🟢 Active" : "🔴 Ended"}
@@ -260,7 +249,7 @@ An Ajo is a traditional savings group where members:
         (a: any, b: any) => b.contribution - a.contribution
       );
 
-      sortedMembers.forEach((member: any, index: any) => {
+      sortedMembers.forEach((member: any, index: number) => { 
         const shareInfo = financialSummary.profit_shares.find(
           (share: any) => share.user_id === member.user_id
         );
@@ -272,7 +261,7 @@ An Ajo is a traditional savings group where members:
         } (${sharePercentage}%)\n`;
       });
 
-      membersMessage += `\n**Total Balance:** $${ajoGroup.current_balance} USDC`;
+      membersMessage += `\n**Total Balance:** ${ajoGroup.current_balance} SOL`;
 
       await ctx.reply(membersMessage, {
         parse_mode: "Markdown",
@@ -316,7 +305,7 @@ An Ajo is a traditional savings group where members:
           "• `/poll_trade <token> <amount>` - Create trade poll\n";
         pollsMessage += "• `/poll_end` - Create end ajo poll";
       } else {
-        polls.forEach((poll: any, index: any) => {
+        polls.forEach((poll: any, index: number) => {
           const timeLeft = Math.max(
             0,
             Math.floor(
@@ -387,7 +376,7 @@ An Ajo is a traditional savings group where members:
 🏆 **Rank:** #${memberSummary.rank}
 💎 **Role:** ${memberSummary.is_trader ? "🛠️ Trader" : "👤 Member"}
 
-💰 **Group Balance:** $${ajoGroup.current_balance} USDC
+💰 **Group Balance:** ${ajoGroup.current_balance} SOL
 👥 **Total Members:** ${ajoGroup.members.length}
 
 💡 **Potential Profit Share:** $${memberSummary.potential_profit_share}
@@ -422,17 +411,6 @@ An Ajo is a traditional savings group where members:
         await getUser(userId, username);
       } catch (error) {
         await ctx.reply("❌ Please register first using /start");
-        return;
-      }
-
-      // Check if this chat already has an ajo group
-      const existingGroup = await getAjoByChatId(chatId);
-      if (existingGroup) {
-        await ctx.reply(
-          `❌ This chat already has an Ajo group: **${existingGroup.name}**\n\n` +
-            `Use \`/ajo info\` to view group details.`,
-          { parse_mode: "Markdown" }
-        );
         return;
       }
 
@@ -528,6 +506,7 @@ An Ajo is a traditional savings group where members:
 ${ajoGroup.members
   .map(
     (member: any, index: any) =>
+    (member: any, index: number) =>
       `${index + 1}. ${member.role === "trader" ? "🛠️" : "👤"} Member (ID: ${
         member.user_id
       })`
@@ -696,13 +675,13 @@ Public group browsing will be available in a future update.
         groupsMessage += "• Use the create buttons above";
       } else {
         userGroups.forEach((group, index) => {
-          const isTrader =
-            group.members.find((m: any) => m.user_id === userId)?.role ===
-            "trader";
+          const isTrader = group.members.find(
+            (m: any) => m.user_id === userId
+          )?.role === "trader";
           const role = isTrader ? "🛠️ Trader" : "👤 Member";
 
           groupsMessage += `${index + 1}. **${group.name}**\n`;
-          groupsMessage += `   ${role} | $${group.current_balance} USDC\n`;
+          groupsMessage += `   ${role} | ${group.current_balance} SOL\n`;
           groupsMessage += `   ${group.members.length}/${group.max_members} members\n`;
           groupsMessage += `   ID: \`${group._id}\`\n\n`;
         });
@@ -782,14 +761,12 @@ Public group browsing will be available in a future update.
 
 **📈 Performance:**
 • Total Trades: ${ajoGroup.trades.length}
-• Successful Trades: ${
-        executedPolls.filter((p: any) => p.type === "trade").length
-      }
+• Successful Trades: ${executedPolls.filter((p: any) => p.type === "trade").length}
 • Active Polls: ${activePolls.length}
 • Total Polls: ${ajoGroup.polls.length}
 
 **💰 Financial:**
-• Current Balance: $${ajoGroup.current_balance} USDC
+• Current Balance: ${ajoGroup.current_balance} SOL
 • Total Contributions: $${financialSummary.total_contributions}
 • Average Contribution: $${financialSummary.average_contribution}
 • Largest Contribution: $${financialSummary.largest_contribution}
@@ -815,7 +792,9 @@ Public group browsing will be available in a future update.
     }
   }
 
-  // Copy group ID handler
+  /**
+   * Copy group ID handler
+   */
   static async handleCopyGroupId(ctx: Context): Promise<void> {
     try {
       await ctx.answerCbQuery("📋 Group ID Copied");
@@ -870,7 +849,7 @@ Public group browsing will be available in a future update.
 1. Go to your Telegram group
 2. Click on the group name at the top
 3. Click "Add Members" or "Add Admins"
-4. Search for: \`@jumpa_ajo_bot\` (or your bot username)
+4. Search for: \`@JumpaSTradingBot\` (or your bot username)
 5. Add the bot to the group
 
 **Step 2: Give Bot Permissions**
@@ -910,7 +889,7 @@ Once the bot is added to your Telegram group:
         [
           Markup.button.url(
             "🔗 Add Bot to Group",
-            "https://t.me/jumpa_ajo_bot?startgroup=true"
+            "https://t.me/JumpaSTradingBot?startgroup=true"
           ),
         ],
         [

@@ -27,16 +27,17 @@ export class CreateGroupCommand extends BaseCommand {
         return;
       }
 
-      if (args.length < 2) {
+      if (args.length < 3) {
         await ctx.reply(
-          "❌ Usage: `/create_group <name> <max_members> [consensus_threshold]`\n\n" +
+          "❌ Usage: `/create_group <name> <max_members> <entry_capital> [consensus_threshold]`\n\n" +
             "**Examples:**\n" +
-            "• `/create_group CryptoCrew 10 67`\n" +
-            "• `/create_group MoonTraders 25`\n" +
-            "• `/create_group DeFi Squad 50 75`\n\n" +
+            "• `/create_group CryptoCrew 10 100 67`\n" +
+            "• `/create_group MoonTraders 25 500`\n" +
+            "• `/create_group DeFi Squad 50 1000 75`\n\n" +
             "**Parameters:**\n" +
             "• **name**: Group name (max 100 characters)\n" +
             "• **max_members**: Maximum members (2-100)\n" +
+            "• **entry_capital**: Entry capital in SOL (must be > 0)\n" +
             "• **consensus_threshold**: Voting threshold % (50-100, default: 67)",
           { parse_mode: "Markdown" }
         );
@@ -46,7 +47,8 @@ export class CreateGroupCommand extends BaseCommand {
       // Parse arguments
       const name = args[0];
       const maxMembers = parseInt(args[1]);
-      const consensusThreshold = args[2] ? parseInt(args[2]) : 67;
+      const entryCapital = parseInt(args[2]);
+      const consensusThreshold = args[3] ? parseInt(args[3]) : 67;
 
       // Validate and sanitize input
       const nameValidation = validateAndSanitizeGroupName(name);
@@ -57,7 +59,7 @@ export class CreateGroupCommand extends BaseCommand {
 
       const validation = validateAjoCreation({
         name: nameValidation.sanitized,
-        initial_capital: 0, // Will be updated when members contribute
+        initial_capital: entryCapital,
         max_members: maxMembers,
         consensus_threshold: consensusThreshold,
       });
@@ -67,41 +69,56 @@ export class CreateGroupCommand extends BaseCommand {
         return;
       }
 
-      // Check if user is registered
+      // Auto-register user if not exists (creates wallet automatically)
+      let user;
       try {
-        await getUser(userId, username);
+        user = await getUser(userId, username);
+        
+        // If this is a new user, send welcome message
+        if (user && !user.last_seen) {
+          await ctx.reply(
+            `👋 Welcome! I've created a wallet for you.\n\n` +
+            `🔑 **Wallet:** \`${user.wallet_address}\`\n\n` +
+            `⚠️ **Important:** You'll need SOL to create groups. Use \`/fund_wallet\` for instructions.`,
+            { parse_mode: "Markdown" }
+          );
+        }
       } catch (error) {
-        await ctx.reply("❌ Please register first using /start");
+        await ctx.reply("❌ Failed to create wallet. Please try /start first.");
         return;
       }
 
-      // Check if this chat already has an ajo group
-      const { getAjoByChatId } = await import("../services/ajoService");
-      const existingGroup = await getAjoByChatId(chatId);
-      if (existingGroup) {
-        await ctx.reply(
-          `❌ This chat already has an Ajo group: **${existingGroup.name}**\n\n` +
-            `Use \`/ajo info\` to view group details.`,
-          { parse_mode: "Markdown" }
-        );
-        return;
-      }
+      // Send initial message to user
+      const processingMessage = await ctx.reply(
+        "🔄 **Creating group on blockchain...**\n\n" +
+        "⏳ This may take up to 2 minutes. Please wait...",
+        { parse_mode: "Markdown" }
+      );
 
-      // Create the ajo group
-      const ajoGroup = await createAjo({
-        name: nameValidation.sanitized,
-        creator_id: userId,
-        telegram_chat_id: chatId,
-        initial_capital: 0,
-        max_members: maxMembers,
-        consensus_threshold: consensusThreshold,
-      });
+      try {
+        // Create the ajo group
+        const ajoGroup = await createAjo({
+          name: nameValidation.sanitized,
+          creator_id: userId,
+          telegram_chat_id: chatId,
+          initial_capital: entryCapital,
+          max_members: maxMembers,
+          consensus_threshold: consensusThreshold,
+        });
 
-      const successMessage = `
+        // Delete the processing message
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat!.id, processingMessage.message_id);
+        } catch (deleteError) {
+          console.log("Could not delete processing message:", deleteError);
+        }
+
+        const successMessage = `
 ✅ **Ajo Group Created Successfully!**
 
 🏠 **Name:** ${ajoGroup.name}
 👥 **Max Members:** ${ajoGroup.max_members}
+💰 **Entry Capital:** ${ajoGroup.initial_capital} SOL
 🗳️ **Consensus:** ${ajoGroup.consensus_threshold}%
 📊 **Status:** Active
 
@@ -120,7 +137,20 @@ export class CreateGroupCommand extends BaseCommand {
 • Use \`/add_members\` to manage members
       `;
 
-      await ctx.reply(successMessage, { parse_mode: "Markdown" });
+        await ctx.reply(successMessage, { parse_mode: "Markdown" });
+      } catch (createError) {
+        // Delete the processing message
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat!.id, processingMessage.message_id);
+        } catch (deleteError) {
+          console.log("Could not delete processing message:", deleteError);
+        }
+
+        console.error("Create group error:", createError);
+        const errorMessage =
+          createError instanceof Error ? createError.message : "Unknown error";
+        await ctx.reply(`❌ Failed to create Ajo group: ${errorMessage}`);
+      }
     } catch (error) {
       console.error("Create group error:", error);
       const errorMessage =

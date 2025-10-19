@@ -97,8 +97,14 @@ export class StartCallbackHandlers {
 🏠 **Ajo Groups:** 0 (Coming Soon!)
       `;
 
+      const { Markup } = await import("telegraf");
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🏠 Back to Main Menu", "back_to_menu")],
+      ]);
+
       await ctx.reply(profileMessage, {
         parse_mode: "Markdown",
+        ...keyboard,
       });
     } catch (error) {
       console.error("View profile error:", error);
@@ -164,14 +170,14 @@ Jumpa is a Telegram bot that enables collaborative trading through Ajo groups - 
 
 **Key Features:**
 🔑 **Auto-generated Solana wallets** for each user
-💰 **Collective fund pooling** with USDC
+💰 **Collective fund pooling** with SOL
 🗳️ **Democratic voting** on trading decisions
 📊 **Transparent profit sharing** based on contributions
 🔒 **Secure smart contract integration**
 
 **How It Works:**
 1. Create or join an Ajo group
-2. Contribute USDC to the group pool
+2. Contribute SOL to the group pool
 3. Vote on trading proposals
 4. Share profits based on your contribution
 
@@ -187,6 +193,66 @@ Jumpa is a Telegram bot that enables collaborative trading through Ajo groups - 
     } catch (error) {
       console.error("Show about error:", error);
       await ctx.answerCbQuery("❌ Failed to show about.");
+    }
+  }
+
+  // Handle back to main menu callback
+  static async handleBackToMenu(ctx: Context): Promise<void> {
+    try {
+      const telegramId = ctx.from?.id;
+      const username = ctx.from?.username || ctx.from?.first_name || "Unknown";
+
+      if (!telegramId) {
+        await ctx.answerCbQuery("❌ Unable to identify your account.");
+        return;
+      }
+
+      await ctx.answerCbQuery("🏠 Back to Main Menu");
+
+      const user = await getUser(telegramId, username);
+
+      if (!user) {
+        await ctx.reply(
+          "❌ User not found. Please use /start to register first."
+        );
+        return;
+      }
+
+      const welcomeMessage = `
+👋 Welcome to Jumpa Ajo Bot, ${username}!
+
+🔑 Your Wallet: \`${user.wallet_address}\`
+💰 Balance: ${user.user_balance} SOL
+
+🚀 Ready to start collaborative trading!
+      `;
+
+      const { Markup } = await import("telegraf");
+      const keyboard = Markup.inlineKeyboard([
+        [
+          Markup.button.callback("🔑 View Wallet", "view_wallet"),
+          Markup.button.callback("📊 My Profile", "view_profile"),
+        ],
+        [
+          Markup.button.callback("🏠 Create Ajo Group", "create_ajo"),
+          Markup.button.callback("👥 Join Ajo Group", "join_ajo"),
+        ],
+        [
+          Markup.button.callback("📊 Ajo Info", "ajo_info"),
+        ],
+        [
+          Markup.button.callback("❓ Help & Commands", "show_help"),
+          Markup.button.callback("ℹ️ About Jumpa", "show_about"),
+        ],
+      ]);
+
+      await ctx.reply(welcomeMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
+    } catch (error) {
+      console.error("Back to menu error:", error);
+      await ctx.answerCbQuery("❌ Failed to return to main menu.");
     }
   }
 }
