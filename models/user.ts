@@ -31,6 +31,24 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    bank_details: {
+      account_number: {
+        type: String,
+        default: "",
+      },
+      account_name: {
+        type: String,
+        default: "",
+      },
+      bank_name: {
+        type: String,
+        default: "",
+      },
+      bank_code: {
+        type: String,
+        default: "",
+      },
+    },
     is_active: {
       type: Boolean,
       default: true,

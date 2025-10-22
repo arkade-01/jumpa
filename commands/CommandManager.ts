@@ -26,9 +26,11 @@ import { PromoteTraderCommand } from "./PromoteTraderCommand";
 import { VoteCommand } from "./VoteCommand";
 import { LeaveGroupCommand } from "./LeaveGroupCommand";
 import { DemoteTraderCommand } from "./DemoteTraderCommand";
+import { getBankUpdateState } from "../state/bankState";
 import { WalletCallbackHandlers } from "./callbackHandlers/WalletCallbackHandlers";
 import { StartCallbackHandlers } from "./callbackHandlers/StartCallbackHandlers";
 import { AjoCallbackHandlers } from "./callbackHandlers/AjoCallbackHandlers";
+import { BankHandler } from "./BankHandler";
 
 export class CommandManager {
   private commands: Map<string, BaseCommand> = new Map();
@@ -88,30 +90,55 @@ export class CommandManager {
       });
     });
 
-    // Register callback handlers for wallet command
-    this.bot.action(
-      "refresh_balance",
-      WalletCallbackHandlers.handleRefreshBalance
-    );
-    this.bot.action("copy_address", WalletCallbackHandlers.handleCopyAddress);
-    this.bot.action(
-      "show_private_key",
-      WalletCallbackHandlers.handleShowPrivateKey
-    );
-    this.bot.action(
-      "wallet_details",
-      WalletCallbackHandlers.handleWalletDetails
-    );
-    this.bot.action("close_wallet", WalletCallbackHandlers.handleCloseWallet);
-
     // Register callback handlers for start command
-    this.bot.action("view_wallet", StartCallbackHandlers.handleViewWallet);
+    // this.bot.action("view_wallet", StartCallbackHandlers.handleViewWallet);
     this.bot.action("view_profile", StartCallbackHandlers.handleViewProfile);
     this.bot.action("create_ajo", StartCallbackHandlers.handleCreateAjo);
     this.bot.action("join_ajo", StartCallbackHandlers.handleJoinAjo);
     this.bot.action("show_help", StartCallbackHandlers.handleShowHelp);
     this.bot.action("show_about", StartCallbackHandlers.handleShowAbout);
     this.bot.action("back_to_menu", StartCallbackHandlers.handleBackToMenu);
+
+    // Register callback handlers for wallet command
+    this.bot.action("deposit_sol", WalletCallbackHandlers.handleDeposit);
+    this.bot.action("withdraw_sol", WalletCallbackHandlers.handleWithdraw);
+    this.bot.action("withdraw_to_bank", WalletCallbackHandlers.handleWithdrawToBank);
+    this.bot.action("withdraw_onchain", WalletCallbackHandlers.handleWithdrawOnchain);
+    this.bot.action(/withdraw_amount:/, WalletCallbackHandlers.handleWithdrawAmount);
+    this.bot.action(/withdraw_confirm:/, WalletCallbackHandlers.handleWithdrawConfirmation);
+    this.bot.action("withdraw_cancel", async (ctx) => {
+      await ctx.answerCbQuery("Cancelled");
+      await ctx.reply("Withdrawal cancelled.");
+    });
+
+
+    //register callback handlers for bank account
+    this.bot.action(
+      "view_bank_account", BankHandler.getBankAccount
+    );
+    this.bot.action(
+      "update_bank_name", BankHandler.updateBankName
+    );
+
+    this.bot.action(/update_bank_name:confirm:/, BankHandler.handleBankNameConfirmation);
+    this.bot.action("update_bank_name:cancel", BankHandler.handleBankNameConfirmation);
+
+    this.bot.action("final_confirmation:confirm", BankHandler.handleFinalConfirmation);
+    this.bot.action("final_confirmation:cancel", BankHandler.handleFinalConfirmation);
+
+    this.bot.on('text', async (ctx) => {
+      const userId = ctx.from?.id;
+      if (!userId) return;
+
+      const state = getBankUpdateState(userId);
+      if (!state) return;
+
+      if (state.step === 'awaiting_bank_name') {
+        await BankHandler.handleBankNameSelection(ctx);
+      } else {
+        await BankHandler.handleBankUpdate(ctx);
+      }
+    });
 
     // Register callback handlers for ajo command
     this.bot.action("ajo_info", AjoCallbackHandlers.handleAjoInfo);
@@ -147,7 +174,7 @@ export class CommandManager {
     this.bot.action("join_with_id", AjoCallbackHandlers.handleJoinWithId);
     this.bot.action("my_groups", AjoCallbackHandlers.handleMyGroups);
     this.bot.action("join_help", AjoCallbackHandlers.handleJoinHelp);
-    this.bot.action("group_stats", AjoCallbackHandlers.handleGroupStats);
+    this.bot.action("group_stats", AjoCallbackHandlers.handleGroupStats)
   }
 
   public getCommand(name: string): BaseCommand | undefined {

@@ -1,65 +1,9 @@
 import { Context } from "telegraf";
 import getUser from "../../services/getUserInfo";
 import { AjoCallbackHandlers } from "./AjoCallbackHandlers";
+import { Markup } from "telegraf";
 
 export class StartCallbackHandlers {
-  // Handle view wallet callback
-  static async handleViewWallet(ctx: Context): Promise<void> {
-    try {
-      const telegramId = ctx.from?.id;
-      const username = ctx.from?.username || ctx.from?.first_name || "Unknown";
-
-      if (!telegramId) {
-        await ctx.answerCbQuery("❌ Unable to identify your account.");
-        return;
-      }
-
-      await ctx.answerCbQuery("🔑 Opening wallet...");
-
-      // Get user info and show wallet
-      const user = await getUser(telegramId, username);
-
-      if (!user) {
-        await ctx.reply(
-          "❌ User not found. Please use /start to register first."
-        );
-        return;
-      }
-
-      const walletMessage = `
-🔑 **Your Solana Wallet**
-
-📍 **Address:** \`${user.wallet_address}\`
-💰 **Balance:** ${user.user_balance} SOL
-📅 **Last Updated:** ${user.last_updated_balance.toLocaleString()}
-
-⚠️ **Security Note:** Keep your private key secure!
-      `;
-
-      // Import WalletCommand keyboard
-      const { Markup } = await import("telegraf");
-      const keyboard = Markup.inlineKeyboard([
-        [
-          Markup.button.callback("🔄 Refresh Balance", "refresh_balance"),
-          Markup.button.callback("📋 Copy Address", "copy_address"),
-        ],
-        [
-          Markup.button.callback("🔐 Show Private Key", "show_private_key"),
-          Markup.button.callback("📊 Wallet Details", "wallet_details"),
-        ],
-        [Markup.button.callback("❌ Close", "close_wallet")],
-      ]);
-
-      await ctx.reply(walletMessage, {
-        parse_mode: "Markdown",
-        ...keyboard,
-      });
-    } catch (error) {
-      console.error("View wallet error:", error);
-      await ctx.answerCbQuery("❌ Failed to open wallet.");
-    }
-  }
-
   // Handle view profile callback
   static async handleViewProfile(ctx: Context): Promise<void> {
     try {
@@ -86,19 +30,29 @@ export class StartCallbackHandlers {
 📊 **Your Profile**
 
 👤 **Username:** ${username}
+
 🆔 **Telegram ID:** ${user.telegram_id}
+
 📍 **Wallet Address:** \`${user.wallet_address}\`
+
 💰 **Balance:** ${user.user_balance} SOL
+
 📅 **Member Since:** ${user.created_at.toLocaleString()}
+
 🔄 **Last Active:** ${user.last_seen?.toLocaleString() || "Never"}
+
 🔒 **Status:** ${user.is_active ? "Active" : "Inactive"}
+
 👑 **Role:** ${user.role}
 
 🏠 **Ajo Groups:** 0 (Coming Soon!)
       `;
 
-      const { Markup } = await import("telegraf");
       const keyboard = Markup.inlineKeyboard([
+        [
+          Markup.button.callback("🏧 Bank Details", "view_bank_account"),
+          Markup.button.callback("✍️ Update Bank Details", "update_bank_name"),
+        ],
         [Markup.button.callback("🏠 Back to Main Menu", "back_to_menu")],
       ]);
 
@@ -127,10 +81,10 @@ export class StartCallbackHandlers {
     try {
       await ctx.answerCbQuery("❓ Help & Commands");
 
-      const helpMessage = `
-❓ **Help & Commands**
+      const helpMessage = 
+`<b>❓ Help & Commands</b>
 
-**Available Commands:**
+<b>Available Commands:</b>
 /start - Start the bot and register
 /wallet - View your wallet information
 /profile - View your profile details
@@ -138,19 +92,16 @@ export class StartCallbackHandlers {
 /ping - Check if bot is alive
 /info - Get bot information
 
-**Coming Soon:**
+<b>Coming Soon:</b>
 /create_ajo - Create an Ajo group
-/join <group_id> - Join an Ajo group
-/vote <poll_id> <yes/no> - Vote on polls
+/join group_id - Join an Ajo group
+/vote poll_id yes/no - Vote on polls
 /history - View trading history
 
-**Need Support?**
-Contact @your_support_username for help!
-      `;
+<b>Need Support?</b>
+Contact @your_support_username for help!`
 
-      await ctx.reply(helpMessage, {
-        parse_mode: "Markdown",
-      });
+      await ctx.reply(helpMessage, { parse_mode: "HTML" });
     } catch (error) {
       console.error("Show help error:", error);
       await ctx.answerCbQuery("❌ Failed to show help.");
@@ -219,12 +170,13 @@ Jumpa is a Telegram bot that enables collaborative trading through Ajo groups - 
       }
 
       const welcomeMessage = `
-👋 Welcome to Jumpa Ajo Bot, ${username}!
+ Welcome to Jumpa Ajo Bot, ${username}!
 
-🔑 Your Wallet: \`${user.wallet_address}\`
-💰 Balance: ${user.user_balance} SOL
+ Your Wallet: \`${user.wallet_address}\`
 
-🚀 Ready to start collaborative trading!
+ Balance: ${user.user_balance} SOL
+ 
+ Ready to start collaborative trading!
       `;
 
       const { Markup } = await import("telegraf");
@@ -234,11 +186,15 @@ Jumpa is a Telegram bot that enables collaborative trading through Ajo groups - 
           Markup.button.callback("📊 My Profile", "view_profile"),
         ],
         [
-          Markup.button.callback("🏠 Create Ajo Group", "create_ajo"),
-          Markup.button.callback("👥 Join Ajo Group", "join_ajo"),
+          Markup.button.callback("🏠 Create Group", "create_ajo"),
+          Markup.button.callback("👥 Join Group", "join_ajo"),
         ],
         [
-          Markup.button.callback("📊 Ajo Info", "ajo_info"),
+          Markup.button.callback("📊 Group Info", "ajo_info"),
+        ],
+        [
+          Markup.button.callback("Deposit", "deposit_sol"),
+          Markup.button.callback("Withdraw", "withdraw_sol"),
         ],
         [
           Markup.button.callback("❓ Help & Commands", "show_help"),

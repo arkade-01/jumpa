@@ -25,33 +25,37 @@ export class StartCommand extends BaseCommand {
 
       if (user) {
         const firstName = ctx.from?.first_name || username;
-        const welcomeMessage = `👋 Welcome to Jumpa Ajo Bot, ${firstName}!
+        const welcomeMessage = `Welcome to Jumpa Ajo Bot, ${firstName}!
 
-🔑 *Your Wallet:*
+ *Your Wallet:*
 \`${user.wallet_address}\`
 
-💰 *Balance:* ${user.user_balance} SOL
+ *Balance:* ${user.user_balance} SOL
 
-🚀 Ready to start collaborative trading!
+ Ready to start collaborative trading!
 
 _Tap the wallet address above to copy it_`;
 
         // Create inline keyboard for quick actions
         const keyboard = Markup.inlineKeyboard([
           [
-            Markup.button.callback("🔑 View Wallet", "view_wallet"),
-            Markup.button.callback("📊 My Profile", "view_profile"),
+            Markup.button.callback(" View Wallet", "view_wallet"),
+            Markup.button.callback(" My Profile", "view_profile"),
           ],
           [
-            Markup.button.callback("🏠 Create Ajo Group", "create_ajo"),
-            Markup.button.callback("👥 Join Ajo Group", "join_ajo"),
+            Markup.button.callback(" Create  Group", "create_ajo"),
+            Markup.button.callback(" Join  Group", "join_ajo"),
           ],
           [
-            Markup.button.callback("📊 Ajo Info", "ajo_info"),
+            Markup.button.callback(" Group Info", "ajo_info"),
           ],
           [
-            Markup.button.callback("❓ Help & Commands", "show_help"),
-            Markup.button.callback("ℹ️ About Jumpa", "show_about"),
+            Markup.button.callback("Deposit", "deposit_sol"),
+            Markup.button.callback("Withdraw", "withdraw_sol"),
+          ],
+          [
+            Markup.button.callback(" Help & Commands", "show_help"),
+            Markup.button.callback(" About Jumpa", "show_about"),
           ],
         ]);
 
