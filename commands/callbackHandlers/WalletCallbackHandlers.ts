@@ -3,6 +3,7 @@ import getUser from "../../services/getUserInfo";
 import { config } from "../../config/config";
 import Withdrawal from "../../models/withdrawal";
 import { WithdrawSolToNgn } from "../WithdrawSolToNgn";
+import { safeDeleteMessage } from "../../utils/messageUtils";
 
 export class WalletCallbackHandlers {
     static async handleDeposit(ctx: Context): Promise<void> {
@@ -108,11 +109,10 @@ export class WalletCallbackHandlers {
             ],
         ]);
 
-        const reply = (await ctx.reply(message, keyboard));
+        const reply = await ctx.reply(message, keyboard);
 
-        setTimeout(async () => {
-            await ctx.deleteMessage(reply.message_id);
-        }, 30000); //delete after 30 secs
+        // Schedule safe deletion of the message
+        await safeDeleteMessage(ctx, reply.message_id);
     }
 
     static async handleWithdrawAmount(ctx: Context): Promise<void> {
@@ -143,9 +143,9 @@ export class WalletCallbackHandlers {
         ]);
 
         const response = await ctx.reply(message, keyboard);
-        setTimeout(async () => {
-            await ctx.deleteMessage(response.message_id);
-        }, 30000); //clear 
+
+        // Schedule safe deletion of the message
+        await safeDeleteMessage(ctx, response.message_id);
     }
 
     static async handleWithdrawConfirmation(ctx: Context): Promise<void> {
@@ -204,7 +204,7 @@ export class WalletCallbackHandlers {
         console.log("payment options: ", paymentOptions)
 
         try {
-           
+
             const getPaymentWidget = await fetch(widget, {
                 method: "POST",
                 headers: {
