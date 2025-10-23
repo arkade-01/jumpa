@@ -29,12 +29,13 @@ export class StartCommand extends BaseCommand {
 
  *Your Wallet:*
 \`${user.wallet_address}\`
+_Tap the wallet address above to copy it_
 
- *Balance:* ${user.user_balance} SOL
+*Balance:* ${user.user_balance} SOL
 
  Ready to start collaborative trading!
 
-_Tap the wallet address above to copy it_`;
+`;
 
         // Create inline keyboard for quick actions
         const keyboard = Markup.inlineKeyboard([

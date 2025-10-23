@@ -88,8 +88,10 @@ Freeze Authority Disabled: ${audit?.freezeAuthorityDisabled ? "✅" : "❌"}
     const keyboard = Markup.inlineKeyboard([
       [
         Markup.button.callback("💰 Buy", `buy:${contractAddress}`),
+        Markup.button.callback("💰 Sell", `sell:${contractAddress}`),,
+      ],[
         Markup.button.url("📊 Chart", `https://dexscreener.com/solana/${contractAddress}`),
-      ],
+      ]
     ]);
 
     await ctx.replyWithHTML(metricsMessage, keyboard);

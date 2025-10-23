@@ -93,8 +93,8 @@ export class StartCallbackHandlers {
 /info - Get bot information
 
 <b>Coming Soon:</b>
-/create_ajo - Create an group
-/join group_id - Join a group
+/create_group - Create a group
+/join_group group_id - Join a group
 /vote poll_id yes/no - Vote on polls
 /history - View trading history
 

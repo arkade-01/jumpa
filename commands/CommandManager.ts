@@ -95,7 +95,7 @@ export class CommandManager {
     });
 
     // Register callback handlers for start command
-    // this.bot.action("view_wallet", StartCallbackHandlers.handleViewWallet);
+    this.bot.action("view_wallet", StartCallbackHandlers.handleViewProfile); //implement wallet view later
     this.bot.action("view_profile", StartCallbackHandlers.handleViewProfile);
     this.bot.action("create_group", StartCallbackHandlers.handleCreateAjo);
     this.bot.action("join_group", StartCallbackHandlers.handleJoinAjo);
