@@ -115,6 +115,11 @@ export class CommandManager {
       await ctx.reply("Withdrawal cancelled.");
     });
 
+    this.bot.action(/buy:.+/, async (ctx) => {
+      await ctx.answerCbQuery("Coming soon!");
+      await ctx.reply("Buy function - coming soon!");
+    });
+
 
     //register callback handlers for bank account
     this.bot.action(

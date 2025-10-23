@@ -43,7 +43,6 @@ export async function handleDetectToken(ctx: Context, contractAddress: string) {
       name,
       symbol,
       icon,
-      decimals,
       usdPrice,
       fdv,
       mcap,
@@ -52,57 +51,44 @@ export async function handleDetectToken(ctx: Context, contractAddress: string) {
       stats24h,
       holderCount,
       audit,
-      organicScoreLabel,
-      organicScore,
     } = token;
 
     // Compute 24h stats safely
     const priceChange = stats24h?.priceChange ?? 0;
-    const buyVolume = stats24h?.buyVolume ?? 0;
-    const sellVolume = stats24h?.sellVolume ?? 0;
+    const priceChangeString = priceChange > 0 ? `+${priceChange.toFixed(2)}` : priceChange.toFixed(2);
     const numTraders = stats24h?.numTraders ?? 0;
 
     // 🧮 Build Telegram message
     const metricsMessage = `
-<b>${name || "Unknown Token"} (${symbol || "?"}) token found</b>
+<b>${name || "Unknown Token"} (${symbol || "?"})</b>
 ${icon ? `<a href="${icon}">🖼️</a>` : ""}
 
 <b>Contract:</b> <code>${contractAddress}</code>
-<b>Decimals:</b> ${decimals ?? "N/A"}
 <b>Verified:</b> ${token.isVerified ? "✅ Yes" : "❌ No"}
 <b>Holders:</b> ${holderCount?.toLocaleString() ?? "N/A"}
 
 
 <b>Key Metrics</b>
 
-💵 <b>Price:</b> $${usdPrice?.toFixed(6) ?? "N/A"}
-📈 <b>24h Change:</b> ${priceChange.toFixed(2)}%
+💵 <b>Price:</b> ${usdPrice?.toFixed(6) ?? "N/A"}
+📈 <b>24h Change:</b> ${priceChangeString}%
 💧 <b>Liquidity:</b> $${liquidity ? liquidity.toLocaleString() : "N/A"}
-📊 <b>24h Buy Volume:</b> $${buyVolume ? buyVolume.toLocaleString() : "N/A"}
-📊 <b>24h Sell Volume:</b> $${sellVolume ? sellVolume.toLocaleString() : "N/A"}
-🏦 <b>Market Cap:</b> $${mcap ? mcap.toLocaleString() : "N/A"}
-💰 <b>FDV:</b> $${fdv ? fdv.toLocaleString() : "N/A"}
+🏦 <b>Market Cap:</b> ${mcap ? mcap.toLocaleString() : "N/A"}
+💰 <b>FDV:</b> ${fdv ? fdv.toLocaleString() : "N/A"}
 🧮 <b>Circulating Supply:</b> ${circSupply?.toLocaleString() ?? "N/A"}
 
-<b>Other Factors to Consider</b>
-
-  Organic Score: ${organicScoreLabel || "N/A"} (${organicScore?.toFixed(2) ?? "0"}%)
-  Mint Authority Disabled: ${audit?.mintAuthorityDisabled ? "✅" : "❌"}
-  Freeze Authority Disabled: ${audit?.freezeAuthorityDisabled ? "✅" : "❌"}
-  24h Traders: ${numTraders?.toLocaleString() ?? "N/A"}
+Mint Authority Disabled: ${audit?.mintAuthorityDisabled ? "✅" : "❌"}
+Freeze Authority Disabled: ${audit?.freezeAuthorityDisabled ? "✅" : "❌"}
+24h Traders: ${numTraders?.toLocaleString() ?? "N/A"}
 
 
-What would you like to do next?
+
     `;
 
     const keyboard = Markup.inlineKeyboard([
       [
         Markup.button.callback("💰 Buy", `buy:${contractAddress}`),
-        Markup.button.callback("📊 Chart", `chart:${contractAddress}`),
-      ],
-      [
-        Markup.button.callback("ℹ️ Token Info", `info:${contractAddress}`),
-        Markup.button.callback("❌ Cancel", "cancel"),
+        Markup.button.url("📊 Chart", `https://dexscreener.com/solana/${contractAddress}`),
       ],
     ]);
 
