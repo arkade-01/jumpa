@@ -26,12 +26,14 @@ import { PromoteTraderCommand } from "./PromoteTraderCommand";
 import { VoteCommand } from "./VoteCommand";
 import { LeaveGroupCommand } from "./LeaveGroupCommand";
 import { DemoteTraderCommand } from "./DemoteTraderCommand";
+import { JoinGroupCommand } from "./JoinGroupCommand";
 import { getBankUpdateState } from "../state/bankState";
 import { WalletCallbackHandlers } from "./callbackHandlers/WalletCallbackHandlers";
 import { StartCallbackHandlers } from "./callbackHandlers/StartCallbackHandlers";
 import { AjoCallbackHandlers } from "./callbackHandlers/AjoCallbackHandlers";
 import { BankHandler } from "./BankHandler";
 import { getWithdrawalState } from "../state/withdrawalState";
+import { handleDetectToken } from "../trading/DetectTokenAddress";
 
 export class CommandManager {
   private commands: Map<string, BaseCommand> = new Map();
@@ -70,6 +72,7 @@ export class CommandManager {
       new PromoteTraderCommand(),
       new VoteCommand(),
       new LeaveGroupCommand(),
+      new JoinGroupCommand(),
       new DemoteTraderCommand(),
     ];
 
@@ -132,12 +135,14 @@ export class CommandManager {
     this.bot.action("set_withdrawal_pin:cancel", BankHandler.handleSetWithdrawalPinConfirmation);
 
     this.bot.on('text', async (ctx) => {
+      const text = ctx.message.text;
+      console.log('Received text message:', text);
       const userId = ctx.from?.id;
       if (!userId) return;
 
       const state = getBankUpdateState(userId);
       const withdrawalState = getWithdrawalState(userId);
-      if (!state && !withdrawalState) return;
+      // if (!state && !withdrawalState) return;
       if (withdrawalState) {
         await WalletCallbackHandlers.handleWithdrawPinVerification(ctx);
         return;
@@ -148,7 +153,17 @@ export class CommandManager {
           await BankHandler.handleBankNameSelection(ctx);
         } else {
           await BankHandler.handleBankUpdate(ctx);
-        }
+        } return;
+      }
+      // Detect if a solana address is sent
+      // Solana address pattern
+      const solanaAddressRegex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+      // Check if it looks like a contract address
+      if (solanaAddressRegex.test(text)) {
+        console.log('Detected potential Solana contract address:', text);
+        await handleDetectToken(ctx, text);
+        return;
       }
     });
 
