@@ -3,8 +3,21 @@ import { CommandManager } from "./commands/CommandManager";
 import { config } from "./config/config";
 import connectToDatabase from "./config/database";
 
+import express from "express";
 
+//NOTE: INSTALLING EXPRESS SERVER SO THE DEPLOYMENT WONT FAIL ON PLATFORMS LIKE RENDER.COM
+const server = express();
+console.log("backend server running...");
 
+server.get("/", (req, res) => res.send({ message: "Bot running ✅", success: true }));
+server.get("/health", (req, res) => res.send({ message: "100% healthy", success: true }));
+
+const PORT = process.env.PORT || 5252;
+server.listen(PORT, () => console.log(`Listening on port ${PORT}`));
+
+//<------- Server SETUP END ------->
+
+//<------- Main FunctionALITY STARTS HERE ------>
 // Initialize the bot with token from environment variables
 const bot = new Telegraf(config.botToken || "");
 
