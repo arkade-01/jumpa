@@ -81,8 +81,8 @@ export class StartCallbackHandlers {
     try {
       await ctx.answerCbQuery("❓ Help & Commands");
 
-      const helpMessage = 
-`<b>❓ Help & Commands</b>
+      const helpMessage =
+        `<b>❓ Help & Commands</b>
 
 <b>Available Commands:</b>
 /start - Start the bot and register
@@ -200,6 +200,7 @@ Jumpa is a Telegram bot that enables collaborative trading through groups - trad
           Markup.button.callback("❓ Help & Commands", "show_help"),
           Markup.button.callback("ℹ️ About Jumpa", "show_about"),
         ],
+        [Markup.button.callback("🔄 Refresh", "back_to_menu")] //fix this later
       ]);
 
       await ctx.reply(welcomeMessage, {

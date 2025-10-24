@@ -1,13 +1,31 @@
 import { Context } from "telegraf";
+import User from "../models/user";
 
-async function getOrder(ctx: Context, tokenAddress: string, amount: number, slippageBps: number, buyerAddress: string) {
-  //NOTE: THE TAKERADDRESS SHOULD BE HARDCODED FOR NOW TILL WE MOVE TO MAINNET. JUPITER REQUIRES AN ACCT WITH REAL SOL TO GET A VALID ORDER
-  // const tokenAddress = "AgBPkSqL64uQ58kka9LqcxyuNk4erExTfM779YYJpump";
-  // const amount = 0.0000001;
+export async function getOrder(ctx: Context, tokenAddress: string, amount: number, slippageBps: number, buyerAddress: string) {
+  if (!ctx.from) {
+    return {
+      success: false,
+      error: "User not identified",
+    };
+  }
+  const user = await User.findOne({ telegram_id: ctx.from.id });
+  if (!user) {
+    return {
+      success: false,
+      error: "User not found. Please /start to create a wallet.",
+    };
+  }
 
   const inputAmount = amount * 1e9; // Convert to lamports
-  const slippage = 50; //0.5% slippage
-  const takerAddress = "6vLdn7HwwFCMh2p33AvprFdfoq97DHVzwLHyULoH8WMR";
+  const slippage = 50; //0.5% slippage. Hardcoded for now.
+  const takerAddress = user.wallet_address;
+
+  if (!takerAddress) {
+    return {
+      success: false,
+      error: "Buyer wallet address not found.",
+    };
+  }
 
   const orderResponse = await fetch(
     `https://lite-api.jup.ag/ultra/v1/order` +
@@ -18,8 +36,8 @@ async function getOrder(ctx: Context, tokenAddress: string, amount: number, slip
     `&taker=${takerAddress}`,
   );
   const orderData = await orderResponse.json();
-  console.log(orderData);
-  console.log("route info", orderData.routePlan);
+  // console.log("order data in getOrder", orderData);
+  // console.log("route info", orderData.routePlan);
 
   if (orderData.error) {
     console.log(orderData.error);
@@ -39,9 +57,11 @@ async function getOrder(ctx: Context, tokenAddress: string, amount: number, slip
     outUsdValue: orderData.outUsdValue,
     priceImpact: orderData.priceImpact,
     swapUsdValue: orderData.swapUsdValue,
-    fee: orderData.swapInfo.feeAmount,
+    fee: orderData.routePlan[0].swapInfo.feeAmount,
+    routeInfo: orderData.routePlan,
   };
 }
+
 
 
 //sample data returned

@@ -34,6 +34,8 @@ import { AjoCallbackHandlers } from "./callbackHandlers/AjoCallbackHandlers";
 import { BankHandler } from "./BankHandler";
 import { getWithdrawalState } from "../state/withdrawalState";
 import { handleDetectToken } from "../trading/DetectTokenAddress";
+import { handleBuy } from "./BuyCommand";
+import { BuyCallbackHandlers } from "./callbackHandlers/BuyCallbackHandlers";
 
 export class CommandManager {
   private commands: Map<string, BaseCommand> = new Map();
@@ -116,10 +118,9 @@ export class CommandManager {
       await ctx.reply("Withdrawal cancelled.");
     });
 
-    this.bot.action(/buy:.+/, async (ctx) => {
-      await ctx.answerCbQuery("Coming soon!");
-      await ctx.reply("Buy function - coming soon!");
-    });
+    this.bot.action(/^buy:.+/, handleBuy);
+    this.bot.action(/^approve_buy:.+/, BuyCallbackHandlers.handleApprove);
+    this.bot.action("decline_buy", BuyCallbackHandlers.handleDecline);
 
 
     //register callback handlers for bank account

@@ -58,6 +58,7 @@ _Tap the wallet address above to copy it_
             Markup.button.callback(" Help & Commands", "show_help"),
             Markup.button.callback(" About Jumpa", "show_about"),
           ],
+          [Markup.button.callback("🔄 Refresh", "back_to_menu")] //fix this later
         ]);
 
         await ctx.reply(welcomeMessage, {

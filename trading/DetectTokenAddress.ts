@@ -4,7 +4,6 @@ import { config } from "../config/config";
 
 export async function handleDetectToken(ctx: Context, contractAddress: string) {
   console.log("Detecting token for address:", contractAddress);
-  const userId = ctx.from?.id;
 
   try {
     // ✅ Validate token address on-chain
@@ -43,6 +42,7 @@ export async function handleDetectToken(ctx: Context, contractAddress: string) {
       name,
       symbol,
       icon,
+      decimals,
       usdPrice,
       fdv,
       mcap,
@@ -60,7 +60,7 @@ export async function handleDetectToken(ctx: Context, contractAddress: string) {
 
     // 🧮 Build Telegram message
     const metricsMessage = `
-<b>${name || "Unknown Token"} (${symbol || "?"})</b>
+<b>${name || "Unknown_Token"} (${symbol || "?"})</b>
 ${icon ? `<a href="${icon}">🖼️</a>` : ""}
 
 <b>Contract:</b> <code>${contractAddress}</code>
@@ -85,11 +85,24 @@ Freeze Authority Disabled: ${audit?.freezeAuthorityDisabled ? "✅" : "❌"}
 
     `;
 
+    //send the CA, decimals, symbol along with buy buttons
     const keyboard = Markup.inlineKeyboard([
       [
-        Markup.button.callback("💰 Buy", `buy:${contractAddress}`),
-        Markup.button.callback("💰 Sell", `sell:${contractAddress}`),,
+        Markup.button.callback("Buy 0.001 SOL", `buy:${contractAddress}:0.001:${decimals}:${symbol}`),
+        Markup.button.callback("Buy 0.002 SOL", `buy:${contractAddress}:0.002:${decimals}:${symbol}`),
+        Markup.button.callback("Buy 0.005 SOL", `buy:${contractAddress}:0.005:${decimals}:${symbol}`),
       ],[
+        Markup.button.callback("Buy 0.01 SOL", `buy:${contractAddress}:0.01:${decimals}:${symbol}`),
+        Markup.button.callback("Buy 0.05 SOL", `buy:${contractAddress}:0.05:${decimals}:${symbol}`),
+        Markup.button.callback("Buy 0.1 SOL", `buy:${contractAddress}:0.1:${decimals}:${symbol}`),
+      ],
+      [
+        Markup.button.callback("Buy 0.5 SOL", `buy:${contractAddress}:0.5:${decimals}:${symbol}`),
+        Markup.button.callback("Buy 1 SOL", `buy:${contractAddress}:1:${decimals}:${symbol}`),
+        Markup.button.callback("Buy 2 SOL", `buy:${contractAddress}:2:${decimals}:${symbol}`),
+      ],
+      [
+        Markup.button.callback("💰 Sell", `sell:${contractAddress}`),
         Markup.button.url("📊 Chart", `https://dexscreener.com/solana/${contractAddress}`),
       ]
     ]);
