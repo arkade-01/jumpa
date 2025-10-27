@@ -41,6 +41,7 @@ import { SellCallbackHandlers } from "./callbackHandlers/SellCallbackHandlers";
 import { handleBuyCustomAmountRequest } from "./callbackHandlers/CustomAmountCallbackHandler";
 import { getUserActionState, clearUserActionState } from "../state/userActionState";
 import { createBuyOrder } from "../trading/createBuyOrder";
+import { handleRefresh } from "./callbackHandlers/RefreshCallbackHandler";
 
 export class CommandManager {
   private commands: Map<string, BaseCommand> = new Map();
@@ -128,6 +129,7 @@ export class CommandManager {
     this.bot.action(/^approve_buy:.+/, BuyCallbackHandlers.handleApprove);
     this.bot.action("decline_buy", BuyCallbackHandlers.handleDecline);
     this.bot.action(/^buy_custom:.+/, handleBuyCustomAmountRequest);
+    this.bot.action(/^refresh:.+/, handleRefresh);
 
     this.bot.action(/^sell:.+/, handleSell);
     this.bot.action(/^approve_sell:.+/, SellCallbackHandlers.handleApprove);
