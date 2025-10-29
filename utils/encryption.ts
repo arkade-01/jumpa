@@ -1,13 +1,10 @@
 import crypto from "crypto";
 
-// Encryption key - use a fixed key for consistency (in production, use a secure environment variable)
-const ENCRYPTION_KEY =
-  process.env.ENCRYPTION_KEY ||
-  "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456"; // Fixed 64-char hex key
-const ALGORITHM = "aes-256-gcm";
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY; // Fixed 64-char hex key
+const ALGORITHM = process.env.ENCRYPTION_ALGORITHM;
 
 /**
- * Encrypts a private key using AES-256-GCM
+ * Encrypts a private key using 
  * @param privateKey - The private key to encrypt (hex string)
  * @returns Object containing encrypted data, iv, and tag
  */
@@ -42,7 +39,7 @@ export function encryptPrivateKey(privateKey: string): string {
 }
 
 /**
- * Decrypts a private key using AES-256-GCM
+ * Decrypts a private key
  * @param encryptedData - The encrypted private key string
  * @returns Decrypted private key (hex string)
  */

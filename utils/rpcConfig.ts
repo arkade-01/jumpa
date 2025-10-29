@@ -8,7 +8,7 @@ export const getSolanaConnection = (): Connection => {
   if (!connection) {
     connection = new Connection(api_url, {
       commitment: "confirmed",
-      confirmTransactionInitialTimeout: 60000,
+      confirmTransactionInitialTimeout:100000,
       disableRetryOnRateLimit: false,
     });
     
@@ -23,6 +23,7 @@ export const getSolanaConnection = (): Connection => {
       }
     } catch (e) {
       // If we can't suppress the errors, that's okay
+      console.log("error suppressing ws errors:", e);
     }
   }
   return connection;
