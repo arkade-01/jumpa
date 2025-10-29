@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY; // Fixed 64-char hex key
-const ALGORITHM = process.env.ENCRYPTION_ALGORITHM;
+const ALGORITHM = "aes-256-gcm";
 
 /**
  * Encrypts a private key using 
