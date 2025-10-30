@@ -27,27 +27,24 @@ export class StartCallbackHandlers {
       }
 
       const profileMessage = `
-📊 **Your Profile**
-
-👤 **Username:** ${username}
-
-🆔 **Telegram ID:** ${user.telegram_id}
-
-📍 **Wallet Address:** \`${user.wallet_address}\`
-
-💰 **Balance:** ${user.user_balance} SOL
-
-📅 **Member Since:** ${user.created_at.toLocaleString()}
-
-🔄 **Last Active:** ${user.last_seen?.toLocaleString() || "Never"}
-
-🔒 **Status:** ${user.is_active ? "Active" : "Inactive"}
-
-👑 **Role:** ${user.role}
-
-🏠 **Groups:** 0 (Coming Soon!)
+      <b>📊 Your Profile</b>
+      
+<b>Username:</b> ${username}
+            
+<b>Wallet Address:</b> <code>${user.wallet_address}</code>
+      
+<b>Balance:</b> ${user.user_balance} SOL
+      
+<b>Member Since:</b> ${user.created_at.toLocaleString()}
+      
+<b>Last Active:</b> ${user.last_seen?.toLocaleString() || "Never"}
+      
+<b>Status:</b> ${user.is_active ? "Active" : "Inactive"}
+      
+<b>Role:</b> ${user.role}
+      
+<b>Groups:</b> 0 (Coming Soon!)
       `;
-
       const keyboard = Markup.inlineKeyboard([
         [
           Markup.button.callback("🏧 Bank Details", "view_bank_account"),
@@ -57,7 +54,7 @@ export class StartCallbackHandlers {
       ]);
 
       await ctx.reply(profileMessage, {
-        parse_mode: "Markdown",
+        parse_mode: "HTML",
         ...keyboard,
       });
     } catch (error) {
