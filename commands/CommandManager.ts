@@ -42,6 +42,7 @@ import { handleBuyCustomAmountRequest } from "./callbackHandlers/CustomAmountCal
 import { getUserActionState, clearUserActionState } from "../state/userActionState";
 import { createBuyOrder } from "../trading/createBuyOrder";
 import { handleRefresh } from "./callbackHandlers/RefreshCallbackHandler";
+import { handleExportPrivateKey, handleProceedExport, handleCancelExport, handlePinForExport } from "./callbackHandlers/ExportWalletCallbackHandler";
 
 export class CommandManager {
   private commands: Map<string, BaseCommand> = new Map();
@@ -112,6 +113,11 @@ export class CommandManager {
     this.bot.action("show_about", StartCallbackHandlers.handleShowAbout);
     this.bot.action("back_to_menu", StartCallbackHandlers.handleBackToMenu);
 
+    // Register callback handlers for exporting private key
+    this.bot.action("export_private_key", handleExportPrivateKey);
+    this.bot.action("proceed_export", handleProceedExport);
+    this.bot.action("cancel_export", handleCancelExport);
+
     // Register callback handlers for wallet command
     this.bot.action("deposit_sol", WalletCallbackHandlers.handleDeposit);
     this.bot.action("withdraw_sol", WalletCallbackHandlers.handleWithdraw);
@@ -172,6 +178,12 @@ export class CommandManager {
           // Create the buy order
           await createBuyOrder(ctx, userAction.tradeId, amount);
           return; // Stop further processing
+      }
+
+      // Handle pin for private key export
+      if (userAction?.action === "awaiting_export_pin") {
+        await handlePinForExport(ctx);
+        return;
       }
 
       const state = getBankUpdateState(userId);

@@ -2,7 +2,7 @@ import { Connection, clusterApiUrl } from "@solana/web3.js";
 import { config } from "../config/config";
 
 let connection: Connection | null = null;
-const api_url = config.solMainnet;
+const api_url = config.solDevnet;
 
 export const getSolanaConnection = (): Connection => {
   if (!connection) {

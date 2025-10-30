@@ -12,5 +12,6 @@ export const config = {
   yaraApiKey: process.env.YARA_API_KEY || "",
   solDevnet: process.env.SOL_DEVNET || "",
   solMainnet: process.env.SOL_MAINNET || "",
+  encryptionKey: process.env.ENCRYPTION_KEY || "",
 
 };

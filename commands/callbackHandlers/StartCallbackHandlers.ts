@@ -49,8 +49,9 @@ export class StartCallbackHandlers {
         [
           Markup.button.callback("🏧 Bank Details", "view_bank_account"),
           Markup.button.callback("✍️ Update Bank Details", "update_bank_name"),
-        ],
-        [Markup.button.callback("🏠 Back to Main Menu", "back_to_menu")],
+        ], [
+          Markup.button.callback("Backup Wallet", "export_private_key"),
+          Markup.button.callback("Back to Main Menu", "back_to_menu")],
       ]);
 
       await ctx.reply(profileMessage, {

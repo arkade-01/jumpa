@@ -1,6 +1,7 @@
 import crypto from "crypto";
+import { config } from "../config/config";  
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY; // Fixed 64-char hex key
+const ENCRYPTION_KEY = config.encryptionKey;
 const ALGORITHM = "aes-256-gcm";
 
 /**
