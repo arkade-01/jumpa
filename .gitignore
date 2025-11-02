@@ -1,3 +1,5 @@
 node_modules
 .env
 jumpabot
+dist
+docs/debug/*.js
