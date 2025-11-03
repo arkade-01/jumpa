@@ -2,6 +2,7 @@ import { Context } from "telegraf";
 import { BaseCommand } from "@bot/commands/BaseCommand";
 import getUser from "@modules/users/getUserInfo";
 import { Markup } from "telegraf";
+import { getAllTokenBalances } from "@shared/utils/getTokenBalances";
 
 export class WalletCommand extends BaseCommand {
   name = "wallet";
@@ -31,12 +32,17 @@ export class WalletCommand extends BaseCommand {
         return;
       }
 
+      // Fetch USDT and USDC token balance
+      const tokenBalances = await getAllTokenBalances(user.solanaWallets[0].address);
+
       // Create wallet info message
       const walletMessage = `
 🔑 **Your Solana Wallet**
 
 📍 **Address:** \`${user.solanaWallets[0].address}\`
-💰 **Balance:** ${user.solanaWallets[0].balance} SOL
+
+SOL: ${(user.solanaWallets[0].balance).toFixed(4)}   • USDC: ${tokenBalances.usdc.toFixed(1)}   • USDT: ${tokenBalances.usdt.toFixed(1)}
+
 📅 **Last Updated:** ${user.solanaWallets[0].last_updated_balance.toLocaleString()}
 
 ⚠️ **Security Note:** Keep your private key secure!

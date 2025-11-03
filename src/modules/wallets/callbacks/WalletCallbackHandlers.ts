@@ -323,9 +323,6 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
             await ctx.answerCbQuery("❌ Unable to identify your account.");
             return;
         }
-        // <---------------SUSPEND FOR NOW ----------->
-        await ctx.reply("🥺 withdrawal services are currently unavailable");
-        return;
         setWithdrawalState(telegramId, 'awaiting_pin', { amount, currency: currency as 'SOL' | 'USDC' | 'USDT' });
 
         const user = await getUser(telegramId, username);
@@ -449,12 +446,11 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
 
             } else {
                 const solAddress = paymentWidget.data.solAddress;
-                const tokenAddress = paymentWidget.data.ethAddress; //you can send usdt and usdc to this address (Solana address)
                 const depositAmount = paymentWidget.data.depositAmount;
                 const fiatPayoutAmount = paymentWidget.data.fiatPayoutAmount;
 
-                // Determine which address to use based on currency
-                const recipientAddress = currency === 'SOL' ? solAddress : tokenAddress;
+                // For SOL, USDC(SOL), and USDT(SOL), all use solAddress
+                const recipientAddress = solAddress;
 
                 const saveTxtoDb = await Withdrawal.create({
                     telegram_id: ctx.from?.id,

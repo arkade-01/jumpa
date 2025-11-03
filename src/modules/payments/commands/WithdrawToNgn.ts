@@ -159,22 +159,22 @@ export async function WithdrawUSDCToNgn(ctx: Context, toAddress: string, amount:
     return { success: false, error: 'User not found' };
   }
 
-  // Validate evm wallet exists for USDC
-  if (!user.evmWallets || user.evmWallets.length === 0 || !user.evmWallets[0]) {
+  // Validate Solana wallet exists for USDC (SPL token on Solana)
+  if (!user.solanaWallets || user.solanaWallets.length === 0 || !user.solanaWallets[0]) {
     await ctx.reply(
-      "❌ No EVM wallet found. Please create a wallet first."
+      "❌ No Solana wallet found. Please create a wallet first."
     );
-    return { success: false, error: 'No EVM wallet found' };
+    return { success: false, error: 'No Solana wallet found' };
   }
 
-  if (!user.evmWallets[0].encryptedPrivateKey) {
+  if (!user.solanaWallets[0].encryptedPrivateKey) {
     await ctx.reply(
-      "❌ Wallet key not found. Please recreate your wallet."
+      "❌ Wallet private key not found. Please recreate your wallet."
     );
-    return { success: false, error: 'Wallet key not found' };
+    return { success: false, error: 'Wallet private key not found' };
   }
 
-  const privKey = decryptPrivateKey(user.evmWallets[0].encryptedPrivateKey);
+  const privKey = decryptPrivateKey(user.solanaWallets[0].encryptedPrivateKey);
 
   try {
     // 1. Load sender's wallet from private key
@@ -320,21 +320,21 @@ export async function WithdrawUSDTToNgn(ctx: Context, toAddress: string, amount:
   }
 
   // Validate Solana wallet exists for USDT (SPL token on Solana)
-  if (!user.evmWallets || user.evmWallets.length === 0 || !user.evmWallets[0]) {
+  if (!user.solanaWallets || user.solanaWallets.length === 0 || !user.solanaWallets[0]) {
     await ctx.reply(
-      "❌ No EVM wallet found. Please create a wallet first."
+      "❌ No Solana wallet found. Please create a wallet first."
     );
-    return { success: false, error: 'No EVM wallet found' };
+    return { success: false, error: 'No Solana wallet found' };
   }
 
-  if (!user.evmWallets[0].encryptedPrivateKey) {
+  if (!user.solanaWallets[0].encryptedPrivateKey) {
     await ctx.reply(
-      "❌ Wallet key not found. Please recreate your wallet."
+      "❌ Wallet private key not found. Please recreate your wallet."
     );
-    return { success: false, error: 'Wallet key not found' };
+    return { success: false, error: 'Wallet private key not found' };
   }
-  //PROBLEM HERE
-  const privKey = decryptPrivateKey(user.evmWallets[0].encryptedPrivateKey);
+
+  const privKey = decryptPrivateKey(user.solanaWallets[0].encryptedPrivateKey);
   try {
     // 1. Load sender's wallet from private key
     const fromWallet = Keypair.fromSecretKey(Buffer.from(privKey, 'hex'));

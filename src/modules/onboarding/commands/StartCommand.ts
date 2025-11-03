@@ -2,6 +2,7 @@ import { Context } from "telegraf";
 import { BaseCommand } from "@bot/commands/BaseCommand";
 import getUser from "@modules/users/getUserInfo";
 import { Markup } from "telegraf";
+import { getAllTokenBalances } from "@shared/utils/getTokenBalances";
 
 export class StartCommand extends BaseCommand {
   name = "start";
@@ -55,14 +56,17 @@ Choose an option:`;
 
         // User has wallet, show normal menu
         const firstName = ctx.from?.first_name || username;
+
+        // Fetch USDT and USDC balance
+        const tokenBalances = await getAllTokenBalances(user.solanaWallets[0].address);
+
         const welcomeMessage = `Welcome to Jumpa Bot, ${firstName}!
 
  *--- Your Solana Wallet ---*
- 
+
 \`${user.solanaWallets[0].address}\`
 
-*Balance:* ${user.solanaWallets[0].balance} SOL
-
+SOL: ${(user.solanaWallets[0].balance).toFixed(4)}   • USDC: ${tokenBalances.usdc.toFixed(1)}   • USDT: ${tokenBalances.usdt.toFixed(1)}
 
 `;
 
