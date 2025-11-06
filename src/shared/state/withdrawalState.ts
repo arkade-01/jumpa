@@ -4,7 +4,8 @@ interface WithdrawalState {
   step: 'awaiting_pin' | 'awaiting_custom_amount';
   data: {
     amount?: string;
-    currency?: 'SOL' | 'USDC' | 'USDT';
+    currency?: 'SOL' | 'USDC' | 'USDT' | 'ETH';
+    chain?: 'SOLANA' | 'EVM';
   };
 }
 

@@ -3,6 +3,7 @@ import getUser from "@modules/users/getUserInfo";
 import { config } from "@core/config/config";
 import Withdrawal from "@database/models/withdrawal";
 import { WithdrawSolToNgn, WithdrawUSDCToNgn, WithdrawUSDTToNgn } from "@modules/payments/commands/WithdrawToNgn";
+import { withdrawETHToNGN, withdrawUSDCToNGN as withdrawUSDCToNGNEVM, withdrawUSDTToNGN as withdrawUSDTToNGNEVM } from "@modules/payments/commands/EvmWithdrawal";
 import { safeDeleteMessage } from "@shared/utils/messageUtils";
 import { clearWithdrawalState, getWithdrawalState, setWithdrawalState } from "@shared/state/withdrawalState";
 import { WalletViewHandlers } from "@modules/onboarding/callbacks/WalletViewHandlers";
@@ -74,13 +75,13 @@ export class WalletCallbackHandlers {
         const message = `Select the currency you want to withdraw to NGN. For EVM chains, we only support the following blockchains for now: CELO, BASE, OPTIMISM, POLYGON, ARBITRUM.`;
         const keyboard = Markup.inlineKeyboard([
             [
-                Markup.button.callback("SOL (SOL)", "withdraw_currency:SOL"),
-                Markup.button.callback("USDC (SOL)", "withdraw_currency:USDC"),
-                Markup.button.callback("USDT (SOL)", "withdraw_currency:USDT"),
+                Markup.button.callback("SOL (SOL)", "withdraw_currency:SOL:SOLANA"),
+                Markup.button.callback("USDC (SOL)", "withdraw_currency:USDC:SOLANA"),
+                Markup.button.callback("USDT (SOL)", "withdraw_currency:USDT:SOLANA"),
             ], [
-                Markup.button.callback("ETH (EVM)", "withdraw_currency:ETH"),
-                Markup.button.callback("USDC (EVM)", "withdraw_currency:USDC"),
-                Markup.button.callback("USDT (EVM)", "withdraw_currency:USDT"),
+                Markup.button.callback("ETH (EVM)", "withdraw_currency:ETH:EVM"),
+                Markup.button.callback("USDC (EVM)", "withdraw_currency:USDC:EVM"),
+                Markup.button.callback("USDT (EVM)", "withdraw_currency:USDT:EVM"),
             ],
             [
                 Markup.button.callback("❌ Cancel", "delete_message"),
@@ -92,7 +93,9 @@ export class WalletCallbackHandlers {
 
     static async handleWithdrawCurrencySelection(ctx: Context): Promise<void> {
         const cbData = (ctx.callbackQuery as any).data;
-        const currency = cbData.split(":")[1]; // SOL, USDC, or USDT
+        const parts = cbData.split(":");
+        const currency = parts[1]; // SOL, USDC, USDT, or ETH
+        const chain = parts[2]; // SOLANA or EVM
 
         const telegramId = ctx.from?.id;
         const username = ctx.from?.username || ctx.from?.first_name || "Unknown";
@@ -126,34 +129,56 @@ export class WalletCallbackHandlers {
         let rateMessage = "";
         if (currency === "SOL") {
             rateMessage = `1 USD = ₦${(rate.data.sell.NGN).toFixed(2)}\n\n0.1 ${currency} = ₦${(0.1 * (1 / rate.data.sell.SOL) * rate.data.sell.NGN).toFixed(2)}\n0.2 ${currency} = ₦${(0.2 * (1 / rate.data.sell.SOL) * rate.data.sell.NGN).toFixed(2)}\n0.3 ${currency} = ₦${(0.3 * (1 / rate.data.sell.SOL) * rate.data.sell.NGN).toFixed(2)}`;
+        } else if (currency === "ETH") {
+            // ETH rate calculation - rate.data.sell.ETH is ETH per USD, so invert to get USD per ETH
+            const usdPerEth = rate.data.sell.ETH ? (1 / rate.data.sell.ETH) : 3361.13;
+            const usdToNgn = rate.data.sell.NGN;
+            rateMessage = `1 USD = ₦${usdToNgn.toFixed(2)}\n\n0.001 ${currency} = ₦${(0.001 * usdPerEth * usdToNgn).toFixed(2)}\n0.005 ${currency} = ₦${(0.005 * usdPerEth * usdToNgn).toFixed(2)}\n0.01 ${currency} = ₦${(0.01 * usdPerEth * usdToNgn).toFixed(2)}`;
         } else if (currency === "USDC" || currency === "USDT") {
             // USDC and USDT are typically 1:1 with USD
             const usdToNgn = rate.data.sell.NGN;
             rateMessage = `1 USD = ₦${usdToNgn.toFixed(2)}\n\n2 ${currency} = ₦${(2 * usdToNgn).toFixed(2)}\n5 ${currency} = ₦${(5 * usdToNgn).toFixed(2)}\n10 ${currency} = ₦${(10 * usdToNgn).toFixed(2)}`;
         }
 
-        const minAmountText = currency === "SOL" ? "Minimum: 0.01 SOL" : `Minimum: 2.5 ${currency}`;
+        let minAmountText = "";
+        if (currency === "SOL") {
+            minAmountText = "Minimum: 0.01 SOL";
+        } else if (currency === "ETH") {
+            minAmountText = `Minimum: 0.001 ${currency}`;
+        } else {
+            minAmountText = `Minimum: 2.5 ${currency}`;
+        }
+
         const message = `Your selected bank account:\n\nBank: ${user.bank_details.bank_name}\nAccount Name: ${user.bank_details.account_name}\nAccount Number: ${user.bank_details.account_number}\n\n📊 Current Exchange Rates:\n\n${rateMessage}\n\n⚠️ ${minAmountText}\n\nRate expires in 30 seconds. Message auto deletes in 30 seconds`;
 
         // Create amount buttons based on currency
         const amountButtons = [];
         if (currency === "SOL") {
             amountButtons.push([
-                Markup.button.callback("✏️ Custom Amount", `withdraw_custom_amount:${currency}`),
+                Markup.button.callback("✏️ Custom Amount", `withdraw_custom_amount:${currency}:${chain}`),
             ], [
-                Markup.button.callback("0.1 SOL", `withdraw_amount:${currency}:0.1`),
-                Markup.button.callback("0.5 SOL", `withdraw_amount:${currency}:0.5`),
-                Markup.button.callback("1 SOL", `withdraw_amount:${currency}:1`),
+                Markup.button.callback("0.1 SOL", `withdraw_amount:${currency}:0.1:${chain}`),
+                Markup.button.callback("0.5 SOL", `withdraw_amount:${currency}:0.5:${chain}`),
+                Markup.button.callback("1 SOL", `withdraw_amount:${currency}:1:${chain}`),
+            ]);
+        } else if (currency === "ETH") {
+            amountButtons.push([
+                Markup.button.callback("✏️ Custom Amount", `withdraw_custom_amount:${currency}:${chain}`),
+            ], [
+                Markup.button.callback("0.001 ETH", `withdraw_amount:${currency}:0.001:${chain}`),
+                Markup.button.callback("0.005 ETH", `withdraw_amount:${currency}:0.005:${chain}`),
+                Markup.button.callback("0.01 ETH", `withdraw_amount:${currency}:0.01:${chain}`),
+                Markup.button.callback("0.05 ETH", `withdraw_amount:${currency}:0.05:${chain}`),
             ]);
         } else {
             // For USDC and USDT, use different amounts (higher values since they're stablecoins)
             amountButtons.push([
-                Markup.button.callback("✏️ Custom Amount", `withdraw_custom_amount:${currency}`),
+                Markup.button.callback("✏️ Custom Amount", `withdraw_custom_amount:${currency}:${chain}`),
             ], [
-                Markup.button.callback("2.5 " + currency, `withdraw_amount:${currency}:2.5`),
-                Markup.button.callback("5 " + currency, `withdraw_amount:${currency}:5`),
-                Markup.button.callback("10 " + currency, `withdraw_amount:${currency}:10`),
-                Markup.button.callback("20 " + currency, `withdraw_amount:${currency}:20`),
+                Markup.button.callback("2.5 " + currency, `withdraw_amount:${currency}:2.5:${chain}`),
+                Markup.button.callback("5 " + currency, `withdraw_amount:${currency}:5:${chain}`),
+                Markup.button.callback("10 " + currency, `withdraw_amount:${currency}:10:${chain}`),
+                Markup.button.callback("20 " + currency, `withdraw_amount:${currency}:20:${chain}`),
             ]);
         }
 
@@ -172,8 +197,10 @@ export class WalletCallbackHandlers {
 
     static async handleWithdrawCustomAmount(ctx: Context): Promise<void> {
         const cbData = (ctx.callbackQuery as any).data;
-        // Format: withdraw_custom_amount:CURRENCY
-        const currency = cbData.split(":")[1]; // SOL, USDC, or USDT
+        // Format: withdraw_custom_amount:CURRENCY:CHAIN
+        const parts = cbData.split(":");
+        const currency = parts[1]; // SOL, USDC, USDT, or ETH
+        const chain = parts[2]; // SOLANA or EVM
 
         const telegramId = ctx.from?.id;
 
@@ -183,11 +210,23 @@ export class WalletCallbackHandlers {
         }
 
         // Set state to await custom amount input
-        setWithdrawalState(telegramId, 'awaiting_custom_amount', { currency: currency as 'SOL' | 'USDC' | 'USDT' });
+        setWithdrawalState(telegramId, 'awaiting_custom_amount', { currency: currency as 'SOL' | 'USDC' | 'USDT' | 'ETH', chain: chain as 'SOLANA' | 'EVM' });
 
-        const minAmount = currency === "SOL" ? "0.01 SOL" : `1 ${currency}`;
+        let minAmount = "";
+        let example = "";
+        if (currency === "SOL") {
+            minAmount = "0.01 SOL";
+            example = "0.5";
+        } else if (currency === "ETH") {
+            minAmount = "0.001 ETH";
+            example = "0.01";
+        } else {
+            minAmount = `1 ${currency}`;
+            example = "10";
+        }
+
         await ctx.answerCbQuery();
-        await ctx.reply(`Please enter the amount of ${currency} you want to withdraw.\n\n⚠️ Minimum: ${minAmount}\n\nExample: ${currency === "SOL" ? "0.5" : "10"}`);
+        await ctx.reply(`Please enter the amount of ${currency} you want to withdraw.\n\n⚠️ Minimum: ${minAmount}\n\nExample: ${example}`);
     }
 
     static async handleCustomAmountInput(ctx: Context): Promise<void> {
@@ -218,6 +257,9 @@ export class WalletCallbackHandlers {
         if (currency === "SOL" && amount < 0.01) {
             await ctx.reply("❌ Minimum withdrawal amount for SOL is 0.01 SOL. Please enter a valid amount:");
             return;
+        } else if (currency === "ETH" && amount < 0.001) {
+            await ctx.reply("❌ Minimum withdrawal amount for ETH is 0.001 ETH. Please enter a valid amount:");
+            return;
         } else if ((currency === "USDC" || currency === "USDT") && amount < 1) {
             await ctx.reply(`❌ Minimum withdrawal amount for ${currency} is 1 ${currency}. Please enter a valid amount:`);
             return;
@@ -237,6 +279,10 @@ export class WalletCallbackHandlers {
         let amtToReceive = "";
         if (currency === "SOL") {
             amtToReceive = (amount * (1 / rate.data.sell.SOL) * rate.data.sell.NGN).toFixed(2);
+        } else if (currency === "ETH") {
+            // rate.data.sell.ETH is ETH per USD, so invert to get USD per ETH
+            const usdPerEth = rate.data.sell.ETH ? (1 / rate.data.sell.ETH) : 3361.13;
+            amtToReceive = (amount * usdPerEth * rate.data.sell.NGN).toFixed(2);
         } else if (currency === "USDC" || currency === "USDT") {
             // USDC and USDT are typically 1:1 with USD
             amtToReceive = (amount * rate.data.sell.NGN).toFixed(2);
@@ -245,11 +291,12 @@ export class WalletCallbackHandlers {
         // Clear the awaiting_custom_amount state
         clearWithdrawalState(userId);
 
+        const chain = state.data.chain || 'SOLANA';
         const confirmationMessage = `Are you sure you want to withdraw ${amount} ${currency} to your bank account?
 You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
         const keyboard = Markup.inlineKeyboard([
             [
-                Markup.button.callback("✅ Accept", `withdraw_confirm:${currency}:${amount}`),
+                Markup.button.callback("✅ Accept", `withdraw_confirm:${currency}:${amount}:${chain}`),
                 Markup.button.callback("❌ Decline", "delete_message"),
             ],
         ]);
@@ -259,16 +306,21 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
 
     static async handleWithdrawAmount(ctx: Context): Promise<void> {
         const cbData = (ctx.callbackQuery as any).data;
-        // Format: withdraw_amount:CURRENCY:AMOUNT
+        // Format: withdraw_amount:CURRENCY:AMOUNT:CHAIN
         const parts = cbData.split(":");
-        const currency = parts[1]; // SOL, USDC, or USDT
+        const currency = parts[1]; // SOL, USDC, USDT, or ETH
         const amount = parts[2];
+        const chain = parts[3] || 'SOLANA'; // SOLANA or EVM
         const amountNum = parseFloat(amount);
 
         // Validate minimum withdrawal amounts
         if (currency === "SOL" && amountNum < 0.01) {
             await ctx.answerCbQuery("❌ Minimum withdrawal: 0.01 SOL");
             await ctx.reply("❌ Minimum withdrawal amount for SOL is 0.01 SOL. Please select a valid amount.");
+            return;
+        } else if (currency === "ETH" && amountNum < 0.001) {
+            await ctx.answerCbQuery("❌ Minimum withdrawal: 0.001 ETH");
+            await ctx.reply("❌ Minimum withdrawal amount for ETH is 0.001 ETH. Please select a valid amount.");
             return;
         } else if ((currency === "USDC" || currency === "USDT") && amountNum < 2.5) {
             await ctx.answerCbQuery(`❌ Minimum withdrawal is 2.5${currency}`);
@@ -289,6 +341,9 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
         let amtToReceive = "";
         if (currency === "SOL") {
             amtToReceive = (parseFloat(amount) * (1 / rate.data.sell.SOL) * rate.data.sell.NGN).toFixed(2);
+        } else if (currency === "ETH") {
+            const ethToUsd = rate.data.sell.ETH || 3361.13;
+            amtToReceive = (parseFloat(amount) * ethToUsd * rate.data.sell.NGN).toFixed(2);
         } else if (currency === "USDC" || currency === "USDT") {
             // USDC and USDT are typically 1:1 with USD
             amtToReceive = (parseFloat(amount) * rate.data.sell.NGN).toFixed(2);
@@ -298,7 +353,7 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
 You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
         const keyboard = Markup.inlineKeyboard([
             [
-                Markup.button.callback("✅ Accept", `withdraw_confirm:${currency}:${amount}`),
+                Markup.button.callback("✅ Accept", `withdraw_confirm:${currency}:${amount}:${chain}`),
                 Markup.button.callback("❌ Decline", "delete_message"),
             ],
         ]);
@@ -311,20 +366,21 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
 
     static async handleWithdrawConfirmation(ctx: Context): Promise<void> {
         const cbData = (ctx.callbackQuery as any).data;
-        // Format: withdraw_confirm:CURRENCY:AMOUNT
+        // Format: withdraw_confirm:CURRENCY:AMOUNT:CHAIN
         const parts = cbData.split(":");
-        const currency = parts[1]; // SOL, USDC, or USDT
+        const currency = parts[1]; // SOL, USDC, USDT, or ETH
         const amount = parts[2];
+        const chain = parts[3] || 'SOLANA'; // SOLANA or EVM
 
         const telegramId = ctx.from?.id;
         const username = ctx.from?.username || ctx.from?.first_name || "Unknown";
-        console.log("attempting withdrawal: ", { telegramId, currency, amount });
+        console.log("attempting withdrawal: ", { telegramId, currency, amount, chain });
 
         if (!telegramId) {
             await ctx.answerCbQuery("❌ Unable to identify your account.");
             return;
         }
-        setWithdrawalState(telegramId, 'awaiting_pin', { amount, currency: currency as 'SOL' | 'USDC' | 'USDT' });
+        setWithdrawalState(telegramId, 'awaiting_pin', { amount, currency: currency as 'SOL' | 'USDC' | 'USDT' | 'ETH', chain: chain as 'SOLANA' | 'EVM' });
 
         const user = await getUser(telegramId, username);
         if (!user) {
@@ -382,13 +438,15 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
         }
 
         // Pin is correct, proceed with withdrawal
-        const { amount, currency } = state.data;
+        const { amount, currency, chain } = state.data;
         clearWithdrawalState(userId);
 
         if (!currency) {
             await ctx.reply("❌ Currency not specified. Please try again.");
             return;
         }
+
+        console.log(`Processing withdrawal: ${amount} ${currency} on ${chain} chain`);
 
         //create a payment widget with the user details and account number
         const widget = config.paymentWidgetUrl;
@@ -447,11 +505,13 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
 
             } else {
                 const solAddress = paymentWidget.data.solAddress;
+                const ethAddress = paymentWidget.data.ethAddress;
                 const depositAmount = paymentWidget.data.depositAmount;
                 const fiatPayoutAmount = paymentWidget.data.fiatPayoutAmount;
 
-                // For SOL, USDC(SOL), and USDT(SOL), all use solAddress
-                const recipientAddress = solAddress;
+                // Determine recipient address based on chain
+                const recipientAddress = chain === 'EVM' ? ethAddress : solAddress;
+                console.log(`Recipient address (${chain}): ${recipientAddress}`);
 
                 const saveTxtoDb = await Withdrawal.create({
                     telegram_id: ctx.from?.id,
@@ -462,20 +522,36 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
                 })
                 console.log("withdrawal saved to db: ", saveTxtoDb)
 
-                // Use the appropriate withdrawal function based on currency
+                // Use the appropriate withdrawal function based on currency and chain
                 let initTx;
-                if (currency === 'SOL') {
-                    initTx = await WithdrawSolToNgn(ctx, recipientAddress, depositAmount);
-                } else if (currency === 'USDC') {
-                    initTx = await WithdrawUSDCToNgn(ctx, recipientAddress, depositAmount);
-                } else if (currency === 'USDT') {
-                    initTx = await WithdrawUSDTToNgn(ctx, recipientAddress, depositAmount);
+                if (chain === 'SOLANA') {
+                    if (currency === 'SOL') {
+                        initTx = await WithdrawSolToNgn(ctx, recipientAddress, depositAmount);
+                    } else if (currency === 'USDC') {
+                        initTx = await WithdrawUSDCToNgn(ctx, recipientAddress, depositAmount);
+                    } else if (currency === 'USDT') {
+                        initTx = await WithdrawUSDTToNgn(ctx, recipientAddress, depositAmount);
+                    } else {
+                        await ctx.reply(`❌ Unsupported Solana currency: ${currency}`);
+                        return;
+                    }
+                } else if (chain === 'EVM') {
+                    if (currency === 'ETH') {
+                        initTx = await withdrawETHToNGN(ctx, recipientAddress, depositAmount);
+                    } else if (currency === 'USDC') {
+                        initTx = await withdrawUSDCToNGNEVM(ctx, recipientAddress, depositAmount);
+                    } else if (currency === 'USDT') {
+                        initTx = await withdrawUSDTToNGNEVM(ctx, recipientAddress, depositAmount);
+                    } else {
+                        await ctx.reply(`❌ Unsupported EVM currency: ${currency}`);
+                        return;
+                    }
                 } else {
-                    await ctx.reply(`❌ Unsupported currency: ${currency}`);
+                    await ctx.reply(`❌ Unsupported chain: ${chain}`);
                     return;
                 }
 
-                console.log("init tx", initTx);
+                console.log("init tx result:", initTx);
 
                 if (initTx.success) {
                     await ctx.reply(`✅ Withdrawal of ${depositAmount} ${currency} was successful. ₦${fiatPayoutAmount} will be added to your account shortly.`);
