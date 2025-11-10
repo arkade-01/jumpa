@@ -69,6 +69,16 @@ const userSchema = new mongoose.Schema(
       },
     ],
     referrals: {
+      referralCode: {
+        type: String,
+        unique: true,
+        sparse: true, // allows null values while maintaining uniqueness
+        index: true,
+      },
+      referralPoints: {
+        type: Number,
+        default: 0,
+      },
       referredBy: {
         type: Number, // telegram_id of the user who referred
         default: null,

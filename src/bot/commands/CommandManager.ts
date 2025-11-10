@@ -37,6 +37,7 @@ import { getUserActionState, clearUserActionState } from "@shared/state/userActi
 import { createBuyOrder } from "@modules/trading/utils/createBuyOrder";
 import { handleRefresh } from "@bot/callbacks/RefreshCallbackHandler";
 import { handleExportPrivateKey, handleProceedExport, handleCancelExport, handlePinForExport } from "@modules/wallets/callbacks/ExportWalletCallbackHandler";
+import { ReferralCommand } from "@modules/referral/commands/ReferralCommand";
 
 export class CommandManager {
   private commands: Map<string, BaseCommand> = new Map();
@@ -68,6 +69,7 @@ export class CommandManager {
       new LeaveGroupCommand(),
       new JoinGroupCommand(),
       new DemoteTraderCommand(),
+      new ReferralCommand(),
     ];
 
     commandInstances.forEach((command) => {
@@ -100,10 +102,18 @@ export class CommandManager {
     this.bot.action("import_wallet", StartCallbackHandlers.handleImportWallet);
     this.bot.action("add_wallet", StartCallbackHandlers.handleAddWallet);
     this.bot.action("add_wallet_solana", StartCallbackHandlers.handleAddSolanaWallet);
-    this.bot.action("add_wallet_evm", StartCallbackHandlers.handleAddEVMWallet); 
+    this.bot.action("add_wallet_evm", StartCallbackHandlers.handleAddEVMWallet);
     this.bot.action("generate_evm_wallet", StartCallbackHandlers.handleGenerateEVMWallet);
     this.bot.action(/set_default_solana:/, StartCallbackHandlers.handleSetDefaultSolanaWallet);
     this.bot.action(/set_default_evm:/, StartCallbackHandlers.handleSetDefaultEVMWallet);
+
+    // Register referral callback handler
+    this.bot.action("referral", async (ctx) => {
+      const referralCommand = this.commands.get("referral");
+      if (referralCommand) {
+        await referralCommand.execute(ctx);
+      }
+    });
 
     // Register callback handlers for exporting private key
     this.bot.action("export_private_key", handleExportPrivateKey);
