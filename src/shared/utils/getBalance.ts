@@ -2,8 +2,8 @@ import { PublicKey } from "@solana/web3.js";
 import { getSolanaConnection } from "./rpcConfig";
 import User from "@database/models/user";
 
-// Cache duration in milliseconds (5 minutes) - matches token balance cache
-const CACHE_DURATION = 5 * 60 * 1000;
+// Cache duration in milliseconds (20 secs) - matches token balance cache
+const CACHE_DURATION = 0.2 * 60 * 1000;
 
 /**
  * Get SOL balance for a Solana wallet address with caching support

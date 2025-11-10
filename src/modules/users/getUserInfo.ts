@@ -1,9 +1,5 @@
 import User from "@database/models/user";
-import createNewSolanaWallet from "@shared/utils/createWallet";
 import getBalance from "@shared/utils/getBalance";
-
-// Cache configuration
-const BALANCE_CACHE_DURATION = 3 * 60 * 1000; //3 minutes
 
 async function getUser(telegram_id: Number, username: string) {
   let user = await User.findOne({ telegram_id });
@@ -38,7 +34,7 @@ export async function updateUserBalance(telegram_id: Number, forceUpdate = false
   const lastUpdated = user.solanaWallets[0].last_updated_balance?.getTime() || 0;
   const cacheAge = now - lastUpdated;
 
-  if (!forceUpdate && cacheAge < BALANCE_CACHE_DURATION) {
+  if (!forceUpdate) {
     console.log(`Using cached balance for ${user.solanaWallets[0].address} (age: ${Math.round(cacheAge / 1000)}s)`);
     return user.solanaWallets[0].balance;
   }

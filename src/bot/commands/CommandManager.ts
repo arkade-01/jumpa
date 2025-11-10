@@ -3,7 +3,6 @@ import { BaseCommand } from "./BaseCommand";
 import { StartCommand } from "@modules/onboarding/commands/StartCommand";
 import { HelpCommand } from "@modules/onboarding/commands/HelpCommand";
 import { WalletCommand } from "@modules/wallets/commands/WalletCommand";
-import { AjoCommand } from "@modules/ajo-groups/commands/AjoCommand";
 import { CreateGroupCommand } from "@modules/ajo-groups/commands/CreateGroupCommand";
 import { GroupCommand } from "@modules/ajo-groups/commands/GroupCommand";
 import { AjoInfoCommand } from "@modules/ajo-groups/commands/AjoInfoCommand";
@@ -55,7 +54,6 @@ export class CommandManager {
       new StartCommand(),
       new HelpCommand(),
       new WalletCommand(),
-      new AjoCommand(),
       new CreateGroupCommand(),
       new GroupCommand(),
       new AjoInfoCommand(),

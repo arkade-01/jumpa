@@ -9,7 +9,7 @@ export const getSolanaConnection = (): Connection => {
     connection = new Connection(api_url, {
       commitment: "confirmed",
       confirmTransactionInitialTimeout:100000,
-      disableRetryOnRateLimit: false,
+      disableRetryOnRateLimit: true,
     });
     
     // Suppress WebSocket error logging (these are non-critical during transaction confirmation)

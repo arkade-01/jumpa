@@ -1,8 +1,16 @@
 import { Context } from "telegraf";
 import { Markup } from "telegraf";
 import { BaseCommand } from "@bot/commands/BaseCommand";
-import { getGroupByChatId } from "@modules/ajo-groups/groupService";
+import {
+  getGroupByChatId,
+  getUserGroups,
+  isUserMember,
+} from "@modules/ajo-groups/groupService";
 import getUser from "@modules/users/getUserInfo";
+import {
+  getGroupFinancialSummary,
+  getMemberFinancialSummary,
+} from "@modules/wallets/balanceService";
 
 export class GroupCommand extends BaseCommand {
   name = "group";
@@ -63,13 +71,29 @@ export class GroupCommand extends BaseCommand {
         case "help":
           await this.showGroupHelp(ctx);
           break;
+        case "info":
+          await this.handleInfo(ctx);
+          break;
+        case "members":
+          await this.handleMembers(ctx);
+          break;
+        case "balance":
+          await this.handleBalance(ctx);
+          break;
+        case "my_groups":
+          await this.handleMyGroups(ctx);
+          break;
         default:
           await ctx.reply(
             "❌ Unknown subcommand. Use:\n" +
             "• `/group` - Group management panel\n" +
             "• `/group status` - Show group status\n" +
-            "• `/group setup` - Show setup instructions\n" +
-            "• `/group help` - Show help information"
+            "• `/group setup` - Setup instructions\n" +
+            "• `/group help` - Help information\n" +
+            "• `/group info` - Group details\n" +
+            "• `/group members` - List members\n" +
+            "• `/group balance` - Your balance\n" +
+            "• `/group my_groups` - Your groups"
           );
       }
     } catch (error) {
@@ -154,14 +178,13 @@ Use this command to create your group:
 \`/create_group <name> <max_members> <type>\`
 
 **Examples:**
-• \`/create_group CryptoCrew 10 0.1 67\`
-• \`/create_group MoonTraders 25\`
-• \`/create_group DeFi Squad 50 75\`
+• \`/create_group CryptoCrew 10 0.1 public\`
+• \`/create_group MoonTraders 25 private\`
+• \`/create_group DeFi Squad 50 private\`
 
 **Step 3: Invite Members**
-1. Share the Group ID with members
-2. They can join using: \`/add_member <group_id>\`
-3. Or use: \`/join <group_id>\`
+1. Share the Group ID with friends
+2. They can join using: \`/join <group_id>\`
 
 **Step 4: Start Trading**
 
@@ -194,14 +217,7 @@ Use this command to create your group:
 • \`members\` - List members
 • \`/polls\` - Show active polls
 • \`/balance\` - Your balance
-• \`/add_member <group_id>\` - Join group
-
-**Polling & Voting:**
-• \`/poll trade <token> <amount>\` - Create trade poll
-• \`/poll end\` - Create end poll
-• \`/vote <poll_id> <yes/no>\` - Vote on polls
-• \`/poll results <poll_id>\` - View results
-• \`/poll execute <poll_id>\` - Execute poll
+• \`/join <group_id>\` - Join group
 
 **User Commands:**
 • \`/start\` - Initialize bot
@@ -209,12 +225,11 @@ Use this command to create your group:
 • \`/profile\` - User profile
 
 **Examples:**
-• \`/create_group CryptoCrew 10 0.1 67\`
-• \`/poll trade BONK 1000\`
-• \`/vote 507f1f77bcf86cd799439012 yes\`
+• \`/create_group CryptoCrew 10 0.1 public\`
+• \`/join 507f1f77bcf86cd799439012 yes\`
 
 **Roles:**
-• **Creator**: Automatically becomes trader
+• **Owner**: Automatically becomes trader
 • **Trader**: Can create polls and execute trades
 • **Member**: Can vote on polls and contribute funds
       `;
@@ -275,6 +290,196 @@ Use this command to create your group:
     } catch (error) {
       console.error("Show group management error:", error);
       await ctx.reply("❌ Failed to show group management options.");
+    }
+  }
+
+  private async handleInfo(ctx: Context): Promise<void> {
+    try {
+      const chatId = ctx.chat?.id;
+      if (!chatId) {
+        await ctx.reply("❌ Unable to identify chat.");
+        return;
+      }
+
+      // Get group for this chat
+      const ajoGroup = await getGroupByChatId(chatId);
+      if (!ajoGroup) {
+        await ctx.reply(
+          "❌ No group found in this chat.\n\n" +
+            "Use `/create_group` to create a new group.",
+          { parse_mode: "Markdown" }
+        );
+        return;
+      }
+
+      // Get financial summary
+      const financialSummary = getGroupFinancialSummary(ajoGroup);
+      const activePolls = ajoGroup.polls.filter(
+        (poll: any) => poll.status === "open"
+      );
+
+      const infoMessage = `
+📊 **Group: ${ajoGroup.name}**
+
+💰 **Capital:** ${ajoGroup.current_balance} SOL
+👥 **Members:** ${ajoGroup.members.length}/${ajoGroup.max_members}
+📈 **Status:** ${ajoGroup.status === "active" ? "🟢 Active" : "🔴 Ended"}
+
+📊 **Financial Summary:**
+• Total Contributions: $${financialSummary.total_contributions}
+• Average Contribution: $${financialSummary.average_contribution}
+• Largest Contribution: $${financialSummary.largest_contribution}
+
+🗳️ **Active Polls:** ${activePolls.length}
+📈 **Total Trades:** ${ajoGroup.trades.length}
+
+**Group ID:** \`${ajoGroup._id}\`
+**Created:** ${new Date(ajoGroup.created_at).toLocaleDateString()}
+      `;
+
+      await ctx.reply(infoMessage, { parse_mode: "Markdown" });
+    } catch (error) {
+      console.error("Info error:", error);
+      await ctx.reply("❌ Failed to get info.");
+    }
+  }
+
+  private async handleMembers(ctx: Context): Promise<void> {
+    try {
+      const chatId = ctx.chat?.id;
+      if (!chatId) {
+        await ctx.reply("❌ Unable to identify chat.");
+        return;
+      }
+
+      // Get group for this chat
+      const ajoGroup = await getGroupByChatId(chatId);
+      if (!ajoGroup) {
+        await ctx.reply("❌ No group found in this chat.");
+        return;
+      }
+
+      // Get financial summary for member details
+      const financialSummary = getGroupFinancialSummary(ajoGroup);
+
+      let membersMessage = `👥 **Members (${ajoGroup.members.length}/${ajoGroup.max_members})**\n\n`;
+
+      // Sort members by contribution (highest first)
+      const sortedMembers = [...ajoGroup.members].sort(
+        (a: any, b: any) => b.contribution - a.contribution
+      );
+
+      sortedMembers.forEach((member: any, index: any) => {
+        const shareInfo = financialSummary.profit_shares.find(
+          (share: any) => share.user_id === member.user_id
+        );
+        const sharePercentage = shareInfo ? shareInfo.share_percentage : 0;
+        const role = member.role === "trader" ? "🛠️ Trader" : "👤 Member";
+
+        membersMessage += `${index + 1}. ${role} - $${
+          member.contribution
+        } (${sharePercentage}%)\n`;
+      });
+
+      membersMessage += `\n**Total Balance:** ${ajoGroup.current_balance} SOL`;
+
+      await ctx.reply(membersMessage, { parse_mode: "Markdown" });
+    } catch (error) {
+      console.error("Members error:", error);
+      await ctx.reply("❌ Failed to get members.");
+    }
+  }
+
+  private async handleBalance(ctx: Context): Promise<void> {
+    try {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
+      if (!userId || !chatId) {
+        await ctx.reply("❌ Unable to identify user or chat.");
+        return;
+      }
+
+      // Get group for this chat
+      const ajoGroup = await getGroupByChatId(chatId);
+      if (!ajoGroup) {
+        await ctx.reply("❌ No group found in this chat.");
+        return;
+      }
+
+      // Check if user is a member
+      const isMember = await isUserMember(ajoGroup._id.toString(), userId);
+      if (!isMember) {
+        await ctx.reply("❌ You are not a member of this group.");
+        return;
+      }
+
+      // Get member's financial summary
+      const memberSummary = getMemberFinancialSummary(ajoGroup, userId);
+      if (!memberSummary) {
+        await ctx.reply("❌ Unable to get your financial information.");
+        return;
+      }
+
+      const balanceMessage = `
+💰 **Your Balance**
+
+👤 **Your Contribution:** $${memberSummary.contribution}
+📊 **Your Share:** ${memberSummary.share_percentage}%
+🏆 **Rank:** #${memberSummary.rank}
+💎 **Role:** ${memberSummary.is_trader ? "🛠️ Trader" : "👤 Member"}
+
+💰 **Group Balance:** ${ajoGroup.current_balance} SOL
+👥 **Total Members:** ${ajoGroup.members.length}
+
+💡 **Potential Profit Share:** $${memberSummary.potential_profit_share}
+*(Based on 10% profit assumption)*
+      `;
+
+      await ctx.reply(balanceMessage, { parse_mode: "Markdown" });
+    } catch (error) {
+      console.error("Balance error:", error);
+      await ctx.reply("❌ Failed to get balance.");
+    }
+  }
+
+  private async handleMyGroups(ctx: Context): Promise<void> {
+    try {
+      const userId = ctx.from?.id;
+      if (!userId) {
+        await ctx.reply("❌ Unable to identify user.");
+        return;
+      }
+
+      // Get user's groups
+      const userGroups = await getUserGroups(userId);
+
+      let groupsMessage = `🏠 **Your Groups (${userGroups.length})**\n\n`;
+
+      if (userGroups.length === 0) {
+        groupsMessage += "You're not a member of any groups yet.\n\n";
+        groupsMessage += "**To join a group:**\n";
+        groupsMessage += "• Get a group ID from an admin\n";
+        groupsMessage += "• Use: `/join <group_id>`\n\n";
+        groupsMessage += "**To create a group:**\n";
+        groupsMessage += "• Use: `/create_group <name> <max_members>`";
+      } else {
+        userGroups.forEach((group, index) => {
+          const isTrader =
+            group.members.find((m: any) => m.user_id === userId)?.role ===
+            "trader";
+          const role = isTrader ? "🛠️ Trader" : "👤 Member";
+
+          groupsMessage += `${index + 1}. **${group.name}**\n`;
+          groupsMessage += `   ${role} | ${group.current_balance} SOL\n`;
+          groupsMessage += `   ${group.members.length}/${group.max_members} members\n`;
+          groupsMessage += `   ID: \`${group._id}\`\n\n`;
+        });
+      }
+
+      await ctx.reply(groupsMessage, { parse_mode: "Markdown" });
+    } catch (error) {
+      console.error("My groups error:", error);
+      await ctx.reply("❌ Failed to get your groups.");
     }
   }
 }
