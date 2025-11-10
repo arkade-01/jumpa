@@ -2,7 +2,6 @@ export { BaseCommand } from "./BaseCommand";
 export { StartCommand } from "@modules/onboarding/commands/StartCommand";
 export { HelpCommand } from "@modules/onboarding/commands/HelpCommand";
 export { WalletCommand } from "@modules/wallets/commands/WalletCommand";
-export { AjoCommand } from "@modules/ajo-groups/commands/AjoCommand";
 export { CreateGroupCommand } from "@modules/ajo-groups/commands/CreateGroupCommand";
 export { GroupCommand } from "@modules/ajo-groups/commands/GroupCommand";
 export { AjoInfoCommand } from "@modules/ajo-groups/commands/AjoInfoCommand";
