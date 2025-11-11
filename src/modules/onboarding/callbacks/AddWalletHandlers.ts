@@ -425,7 +425,15 @@ Your wallet has been added to your account!`;
 
       if (newWallet && newWallet.success) {
         // Encrypt and save
-        const encryptedPrivateKey = encryptPrivateKey(newWallet.newPrivateKey);
+        console.log("new wallet", newWallet)
+
+        // Remove 0x prefix if present (ethers.js always returns private keys with 0x prefix)
+        const pKeyWithout0x = newWallet.newPrivateKey.startsWith("0x")
+          ? newWallet.newPrivateKey.slice(2)
+          : newWallet.newPrivateKey;
+
+        const encryptedPrivateKey = encryptPrivateKey(pKeyWithout0x);
+        console.log("encrypted pkey: ", encryptedPrivateKey)
         await addEVMWalletToUser(
           telegramId,
           newWallet.newAddress,
