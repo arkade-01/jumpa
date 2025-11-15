@@ -35,7 +35,7 @@ import { handleBuyCustomAmountRequest } from "@modules/trading/callbacks/CustomA
 import { getUserActionState, clearUserActionState } from "@shared/state/userActionState";
 import { createBuyOrder } from "@modules/trading/utils/createBuyOrder";
 import { handleRefresh } from "@bot/callbacks/RefreshCallbackHandler";
-import { handleExportPrivateKey, handleProceedExport, handleCancelExport, handlePinForExport } from "@modules/wallets/callbacks/ExportWalletCallbackHandler";
+import { handleExportPrivateKey, handleSelectWalletForExport, handleCancelExport, handlePinForExport } from "@modules/wallets/callbacks/ExportWalletCallbackHandler";
 import { ReferralCommand } from "@modules/referral/commands/ReferralCommand";
 
 export class CommandManager {
@@ -119,7 +119,8 @@ export class CommandManager {
 
     // Register callback handlers for exporting private key
     this.bot.action("export_private_key", handleExportPrivateKey);
-    this.bot.action("proceed_export", handleProceedExport);
+    this.bot.action("show_private_key", handleExportPrivateKey); // Alias from /wallet command
+    this.bot.action(/^select_export_(sol|evm):\d+$/, handleSelectWalletForExport);
     this.bot.action("cancel_export", handleCancelExport);
 
     // Register callback handlers for wallet command
@@ -142,6 +143,20 @@ export class CommandManager {
         await ctx.answerCbQuery("Message deleted");
       }
     });
+
+    // Register close_wallet as alias for delete_message
+    this.bot.action("close_wallet", async (ctx) => {
+      try {
+        await ctx.deleteMessage();
+        await ctx.answerCbQuery("Closed");
+      } catch (error) {
+        console.error("Error deleting message:", error);
+        await ctx.answerCbQuery("Message closed");
+      }
+    });
+
+    // Register wallet_details to show full wallet view
+    this.bot.action("wallet_details", StartCallbackHandlers.handleViewWallet);
 
     //register buy and sell commands
     this.bot.action(/^buy:.+/, handleBuy);
