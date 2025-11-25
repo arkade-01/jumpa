@@ -507,7 +507,7 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
             "fromCurrency": currency,
             "payoutCurrency": "NGN",
             "publicKey": "pk_test_GIST",
-            "developerFee": "0.5", //platform charges for each withdrawal in string
+            "developerFee": "1", //platform charges for each withdrawal in string
             "payoutType": "DIRECT_DEPOSIT"
         };
         console.log("payment options: ", paymentOptions)
