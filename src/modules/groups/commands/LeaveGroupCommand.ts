@@ -72,8 +72,7 @@ export class LeaveGroupCommand extends BaseCommand {
         if (group.onchain_group_address) {
           await solanaService.exitGroup({
             telegramId: userId,
-            groupName: group.name,
-            ownerPubkey: owner.solanaWallets[0].address,
+            groupPDA: group.onchain_group_address,
           });
         }
 
@@ -108,14 +107,14 @@ Your member profile has been closed and any remaining balance will be returned t
 
         console.error("Leave group error:", exitError);
         let errorMessage = exitError instanceof Error ? exitError.message : "Unknown error";
-        
+
         // Provide helpful message for RPC errors
         if (errorMessage.includes('fetch failed') || errorMessage.includes('failed to get')) {
           errorMessage = "Network connection issue. The RPC endpoint is temporarily unavailable. Please try again in a few moments.";
         } else if (errorMessage.includes('NotAMemberError') || errorMessage.includes('6009')) {
           errorMessage = "You are not a member of this group on-chain.";
         }
-        
+
         await ctx.reply(`❌ Failed to leave group: ${errorMessage}`);
       }
     } catch (error) {

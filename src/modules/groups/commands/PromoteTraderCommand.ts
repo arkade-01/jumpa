@@ -26,8 +26,8 @@ export class PromoteTraderCommand extends BaseCommand {
       if (args.length < 1) {
         await ctx.reply(
           "❌ Usage: `/promote_trader <username>`\n\n" +
-            "**Example:** `/promote_trader @john_doe` or `/promote_trader john_doe`\n\n" +
-            "**Note:** Only the group owner can promote members to traders.",
+          "**Example:** `/promote_trader @john_doe` or `/promote_trader john_doe`\n\n" +
+          "**Note:** Only the group owner can promote members to traders.",
           { parse_mode: "Markdown" }
         );
         return;
@@ -45,7 +45,7 @@ export class PromoteTraderCommand extends BaseCommand {
       if (!targetUser) {
         await ctx.reply(
           `❌ User @${targetUsername} not found.\n\n` +
-            "Make sure they have registered with the bot using /start.",
+          "Make sure they have registered with the bot using /start.",
           { parse_mode: "Markdown" }
         );
         return;
@@ -64,7 +64,7 @@ export class PromoteTraderCommand extends BaseCommand {
       if (group.creator_id !== userId) {
         await ctx.reply(
           "❌ Only the group owner can promote members to traders.\n\n" +
-            "Contact the group owner to change member roles.",
+          "Contact the group owner to change member roles.",
           { parse_mode: "Markdown" }
         );
         return;
@@ -77,7 +77,7 @@ export class PromoteTraderCommand extends BaseCommand {
       if (!targetMember) {
         await ctx.reply(
           `❌ User ${targetUserId} is not a member of this group.\n\n` +
-            "They need to join the group first using `/join`.",
+          "They need to join the group first using `/join`.",
           { parse_mode: "Markdown" }
         );
         return;
@@ -97,7 +97,7 @@ export class PromoteTraderCommand extends BaseCommand {
       );
 
       try {
-        // Add trader on-chain first
+        // Add trader on-chain (this also updates the database)
         let onChainResult;
         if (group.onchain_group_address) {
           onChainResult = await addTraderToGroup(
@@ -105,11 +105,11 @@ export class PromoteTraderCommand extends BaseCommand {
             targetUserId,
             userId
           );
+        } else {
+          // If no on-chain address, just update database
+          await promoteToTrader(group._id.toString(), targetUserId);
         }
 
-        // Update database
-        await promoteToTrader(group._id.toString(), targetUserId);
-        
         const wasAlreadyOnChain = onChainResult?.signature === 'already_exists';
 
         // Delete the processing message
@@ -161,12 +161,12 @@ ${wasAlreadyOnChain ? '\n📝 Note: User was already a trader on-chain, database
 
         console.error("Promote trader error:", promoteError);
         let errorMessage = promoteError instanceof Error ? promoteError.message : "Unknown error";
-        
+
         // Provide helpful message for RPC errors
         if (errorMessage.includes('fetch failed') || errorMessage.includes('failed to get info about account')) {
           errorMessage = "Network connection issue. The RPC endpoint is temporarily unavailable. Please try again in a few moments.";
         }
-        
+
         await ctx.reply(`❌ Failed to promote trader: ${errorMessage}`);
       }
     } catch (error) {

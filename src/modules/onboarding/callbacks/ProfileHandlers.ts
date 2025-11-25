@@ -2,6 +2,7 @@ import { Context } from "telegraf";
 import getUser from "@modules/users/getUserInfo";
 import { Markup } from "telegraf";
 import { getUserGroups } from "@modules/groups/groupService";
+import { sendOrEdit } from "@shared/utils/messageHelper";
 
 export class ProfileHandlers {
   // Handle view profile callback
@@ -55,7 +56,7 @@ export class ProfileHandlers {
           Markup.button.callback("Back to Main Menu", "back_to_menu")],
       ]);
 
-      await ctx.reply(profileMessage, {
+      await sendOrEdit(ctx, profileMessage, {
         parse_mode: "HTML",
         ...keyboard,
       });

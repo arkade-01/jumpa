@@ -37,6 +37,7 @@ import { createBuyOrder } from "@modules/trading/utils/createBuyOrder";
 import { handleRefresh } from "@bot/callbacks/RefreshCallbackHandler";
 import { handleExportPrivateKey, handleSelectWalletForExport, handleCancelExport, handlePinForExport } from "@modules/wallets/callbacks/ExportWalletCallbackHandler";
 import { ReferralCommand } from "@modules/referral/commands/ReferralCommand";
+import { ImageTestCommand } from "@modules/onboarding/commands/ImageTestCommand";
 
 export class CommandManager {
   private commands: Map<string, BaseCommand> = new Map();
@@ -68,6 +69,7 @@ export class CommandManager {
       new JoinGroupCommand(),
       new DemoteTraderCommand(),
       new ReferralCommand(),
+      new ImageTestCommand(),
     ];
 
     commandInstances.forEach((command) => {
@@ -96,6 +98,7 @@ export class CommandManager {
     this.bot.action("show_help", StartCallbackHandlers.handleShowHelp);
     this.bot.action("show_about", StartCallbackHandlers.handleShowAbout);
     this.bot.action("back_to_menu", StartCallbackHandlers.handleBackToMenu);
+    this.bot.action("back_to_group_menu", StartCallbackHandlers.handleBackToGroupMenu);
     this.bot.action("generate_wallet", StartCallbackHandlers.handleGenerateWallet);
     this.bot.action("import_wallet", StartCallbackHandlers.handleImportWallet);
     this.bot.action("add_wallet", StartCallbackHandlers.handleAddWallet);

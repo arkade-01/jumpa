@@ -1,24 +1,13 @@
 import { Context } from "telegraf";
 import { BaseCommand } from "@bot/commands/BaseCommand";
+import { getHelpContent } from "@modules/onboarding/utils/helpContent";
 
 export class HelpCommand extends BaseCommand {
   name = "help";
   description = "Show help message with available commands";
 
   async execute(ctx: Context): Promise<void> {
-    const helpText = `
-🤖 *Jumpa Bot Commands:*
-
-/start - Start the bot
-/help - Show this help message
-/ping - Check if bot is alive
-/info - Get bot information
-
-*Features:*
-• Fast and responsive
-• Built with TypeScript
-• Ready for customization
-    `;
-    await this.sendMessage(ctx, helpText, "Markdown");
+    const { message, options } = getHelpContent(false);
+    await ctx.reply(message, options);
   }
 }

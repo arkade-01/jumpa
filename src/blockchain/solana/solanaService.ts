@@ -1,7 +1,7 @@
-import { 
-  Connection, 
-  PublicKey, 
-  Keypair, 
+import {
+  Connection,
+  PublicKey,
+  Keypair,
   SystemProgram,
   Transaction,
   TransactionInstruction,
@@ -52,7 +52,7 @@ function createWalletFromKeypair(keypair: Keypair): Wallet {
 export async function getProviderForUser(telegramId: number): Promise<AnchorProvider> {
   const connection = getSolanaConnection();
   const user = await User.findOne({ telegram_id: telegramId });
-  
+
   if (!user) {
     throw new Error("User not found. Please register first.");
   }
@@ -106,13 +106,13 @@ export function deriveMemberProfilePDA(group: PublicKey, member: PublicKey): [Pu
  * Seeds: PROPOSAL_SEED, signer public key, group public key, nonce
  */
 export function deriveProposalPDA(
-  proposer: PublicKey, 
-  group: PublicKey, 
+  proposer: PublicKey,
+  group: PublicKey,
   nonce: BN
 ): [PublicKey, number] {
   const nonceBuffer = Buffer.alloc(8);
   nonceBuffer.writeBigUInt64BE(BigInt(nonce.toString())); // Use Big Endian to match Rust's to_be_bytes()
-  
+
   return PublicKey.findProgramAddressSync(
     [PROPOSAL_SEED, proposer.toBuffer(), group.toBuffer(), nonceBuffer],
     PROGRAM_ID
@@ -139,11 +139,11 @@ export function deriveVotePDA(
 export async function checkGroupExists(groupName: string, signer: PublicKey): Promise<boolean> {
   try {
     const [groupPDA] = deriveGroupPDA(groupName, signer);
-    
+
     // Try to fetch the account info
     const connection = getSolanaConnection();
     const accountInfo = await connection.getAccountInfo(groupPDA);
-    
+
     // If account exists and has data, the group already exists
     return accountInfo !== null && accountInfo.data.length > 0;
   } catch (error) {
@@ -159,7 +159,7 @@ export async function checkWalletBalance(walletAddress: PublicKey, minBalanceLam
   try {
     const connection = getSolanaConnection();
     const balance = await connection.getBalance(walletAddress);
-    
+
     return {
       hasBalance: balance >= minBalanceLamports,
       balance: balance,
@@ -185,20 +185,20 @@ async function executeTransactionWithTimeout<T>(
   timeoutMs: number = 120000 // 2 minutes
 ): Promise<T> {
   console.log(`Executing transaction with ${timeoutMs}ms timeout...`);
-  
+
   // Create a timeout promise
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => {
       reject(new Error(`Transaction timed out after ${timeoutMs}ms. The transaction may still have succeeded on-chain. Please check the blockchain explorer.`));
     }, timeoutMs);
   });
-  
+
   // Race between transaction and timeout
   const result = await Promise.race([
     transactionFn(),
     timeoutPromise
   ]);
-  
+
   console.log(`Transaction completed successfully`);
   return result;
 }
@@ -209,26 +209,26 @@ async function executeTransactionWithTimeout<T>(
 async function verifyTransactionSuccess(signature: string): Promise<boolean> {
   try {
     const connection = getSolanaConnection();
-    
+
     // Wait a bit for transaction to be processed
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     // Get transaction details
     const txDetails = await connection.getTransaction(signature, {
       commitment: 'confirmed',
       maxSupportedTransactionVersion: 0
     });
-    
+
     if (!txDetails) {
       console.log('Transaction not found in blockchain');
       return false;
     }
-    
+
     if (txDetails.meta?.err) {
       console.log('Transaction failed:', txDetails.meta.err);
       return false;
     }
-    
+
     console.log('Transaction verified successfully');
     return true;
   } catch (error) {
@@ -278,7 +278,7 @@ export async function initializeGroup(params: InitializeGroupParams) {
     console.log('Group Name (hex):', Buffer.from(params.groupName, 'utf8').toString('hex'));
     console.log('Signer Pubkey:', signer.toBase58());
     console.log('GROUP_SEED:', GROUP_SEED.toString('hex'));
-    
+
     // Derive PDAs
     const [groupPDA, groupBump] = deriveGroupPDA(params.groupName, signer);
     const [memberProfilePDA, memberBump] = deriveMemberProfilePDA(groupPDA, signer);
@@ -349,7 +349,7 @@ export async function joinGroup(params: JoinGroupParams) {
     // Check if member profile already exists
     const [memberProfilePDA] = deriveMemberProfilePDA(groupPubkey, signer);
     const connection = getSolanaConnection();
-    
+
     let memberAccountInfo;
     try {
       memberAccountInfo = await connection.getAccountInfo(memberProfilePDA);
@@ -358,7 +358,7 @@ export async function joinGroup(params: JoinGroupParams) {
       // Continue without checking - the on-chain program will reject if already exists
       memberAccountInfo = null;
     }
-    
+
     if (memberAccountInfo && memberAccountInfo.data.length > 0) {
       throw new Error(`You are already a member of this group. Member profile exists at: ${memberProfilePDA.toBase58()}`);
     }
@@ -424,8 +424,7 @@ export async function joinGroup(params: JoinGroupParams) {
  */
 export interface ExitGroupParams {
   telegramId: number;
-  groupName: string;
-  ownerPubkey: string;
+  groupPDA: string;
 }
 
 export async function exitGroup(params: ExitGroupParams) {
@@ -434,12 +433,11 @@ export async function exitGroup(params: ExitGroupParams) {
     const program = getProgram(provider);
     const signer = provider.wallet.publicKey;
 
-    const ownerPubkey = new PublicKey(params.ownerPubkey);
-    const [groupPDA] = deriveGroupPDA(params.groupName, ownerPubkey);
-    const [memberProfilePDA] = deriveMemberProfilePDA(groupPDA, signer);
+    const groupPubkey = new PublicKey(params.groupPDA);
+    const [memberProfilePDA] = deriveMemberProfilePDA(groupPubkey, signer);
 
-    console.log(`Exiting group: ${params.groupName}`);
-    console.log(`Group PDA: ${groupPDA.toBase58()}`);
+    console.log(`Exiting group`);
+    console.log(`Group PDA: ${groupPubkey.toBase58()}`);
     console.log(`Member Profile PDA: ${memberProfilePDA.toBase58()}`);
 
     // Check wallet balance
@@ -462,14 +460,12 @@ export async function exitGroup(params: ExitGroupParams) {
     }
 
     // Execute the transaction with timeout (no retries to prevent double-execution)
-    // Note: exitGroup needs name parameter for PDA derivation (required by #[instruction(name: String)])
     const tx = await executeTransactionWithTimeout(async () => {
       return await program.methods
-        .exitGroup(params.groupName)
+        .exitGroup()
         .accounts({
           signer: signer,
-          owner: ownerPubkey,
-          group: groupPDA,
+          group: groupPubkey,
           memberProfile: memberProfilePDA,
           systemProgram: SystemProgram.programId,
         })
@@ -665,8 +661,8 @@ export async function proposeTrade(params: ProposeTradeParams) {
 
     // Derive PDAs
     const [proposalPDA, proposalBump] = deriveProposalPDA(
-      signer, 
-      groupPubkey, 
+      signer,
+      groupPubkey,
       new BN(params.nonce)
     );
     const [memberProfilePDA, memberBump] = deriveMemberProfilePDA(groupPubkey, signer);
@@ -679,12 +675,12 @@ export async function proposeTrade(params: ProposeTradeParams) {
     console.log(`Group PDA: ${groupPubkey.toBase58()}`);
     console.log(`Group bytes (hex): ${groupPubkey.toBuffer().toString('hex')}`);
     console.log(`Nonce: ${params.nonce}`);
-    
+
     const nonceBuf = Buffer.alloc(8);
     nonceBuf.writeBigUInt64BE(BigInt(params.nonce));
     console.log(`Nonce (hex BE): ${nonceBuf.toString('hex')}`);
     console.log(`Nonce (base64): ${nonceBuf.toString('base64')}`);
-    
+
     console.log(`Derived Proposal PDA: ${proposalPDA.toBase58()}`);
     console.log(`Expected by program: 4Beiqhg9dzKcq7e5c6cNUvNdG6Rss27ADFsoYfhSmFX9`);
     console.log(`Member Profile PDA: ${memberProfilePDA.toBase58()}`);
@@ -836,7 +832,7 @@ export async function vote(params: VoteParams) {
 export async function fetchGroupAccount(groupPDA: string, telegramId?: number) {
   try {
     let provider: AnchorProvider;
-    
+
     if (telegramId) {
       provider = await getProviderForUser(telegramId);
     } else {
@@ -849,9 +845,9 @@ export async function fetchGroupAccount(groupPDA: string, telegramId?: number) {
 
     const program = getProgram(provider);
     const groupPubkey = new PublicKey(groupPDA);
-    
+
     const groupAccount: any = await program.account['group'].fetch(groupPubkey);
-    
+
     return {
       owner: groupAccount.owner.toBase58(),
       name: groupAccount.name,
@@ -879,7 +875,7 @@ export async function fetchGroupAccount(groupPDA: string, telegramId?: number) {
 export async function fetchMemberProfile(memberProfilePDA: string, telegramId?: number) {
   try {
     let provider: AnchorProvider;
-    
+
     if (telegramId) {
       provider = await getProviderForUser(telegramId);
     } else {
@@ -891,15 +887,15 @@ export async function fetchMemberProfile(memberProfilePDA: string, telegramId?: 
 
     const program = getProgram(provider);
     const memberProfilePubkey = new PublicKey(memberProfilePDA);
-    
+
     const memberProfile: any = await program.account['memberProfile'].fetch(memberProfilePubkey);
-    
+
     return {
       group: memberProfile.group.toBase58(),
       pubkey: memberProfile.pubkey.toBase58(),
       name: memberProfile.name,
-      lastProposalDate: memberProfile.lastProposalDate 
-        ? new Date(memberProfile.lastProposalDate.toNumber() * 1000) 
+      lastProposalDate: memberProfile.lastProposalDate
+        ? new Date(memberProfile.lastProposalDate.toNumber() * 1000)
         : null,
     };
   } catch (error) {
@@ -914,7 +910,7 @@ export async function fetchMemberProfile(memberProfilePDA: string, telegramId?: 
 export async function fetchTradeProposal(proposalPDA: string, telegramId?: number) {
   try {
     let provider: AnchorProvider;
-    
+
     if (telegramId) {
       provider = await getProviderForUser(telegramId);
     } else {
@@ -926,9 +922,9 @@ export async function fetchTradeProposal(proposalPDA: string, telegramId?: numbe
 
     const program = getProgram(provider);
     const proposalPubkey = new PublicKey(proposalPDA);
-    
+
     const proposal: any = await program.account['tradeProposal'].fetch(proposalPubkey);
-    
+
     return {
       group: proposal.group.toBase58(),
       proposer: proposal.proposer.toBase58(),
@@ -961,7 +957,7 @@ export async function fetchAllGroupProposals(groupPDA: string) {
     const program = getProgram(provider);
 
     const groupPubkey = new PublicKey(groupPDA);
-    
+
     // Fetch all TradeProposal accounts for this group
     const proposals: any = await program.account['tradeProposal'].all([
       {

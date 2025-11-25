@@ -34,12 +34,29 @@ const TOKEN_ADDRESSES = {
   }
 };
 
+// Explorer URLs for supported chains
+const CHAIN_EXPLORERS = {
+  CELO: 'https://celoscan.io',
+  BASE: 'https://basescan.org',
+  OPTIMISM: 'https://optimistic.etherscan.io',
+  POLYGON: 'https://polygonscan.com',
+  ARBITRUM: 'https://arbiscan.io'
+};
+
 // ERC-20 ABI (minimal - balanceOf and transfer functions)
 const ERC20_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
   'function transfer(address to, uint256 amount) returns (bool)',
   'function decimals() view returns (uint8)'
 ];
+
+/**
+ * Get explorer URL for a transaction on a specific chain
+ */
+function getExplorerUrl(txHash: string, chain: keyof typeof CHAIN_EXPLORERS): string {
+  const baseUrl = CHAIN_EXPLORERS[chain];
+  return `${baseUrl}/tx/${txHash}`;
+}
 
 /**
  * Get ETH balance for an EVM wallet address on a specific chain
@@ -196,7 +213,7 @@ export async function withdrawETHToNGN(ctx: Context, toAddress: string, amount: 
 
     console.log(`✅ Transaction confirmed in block ${receipt?.blockNumber}`);
     console.log(`Gas used: ${receipt?.gasUsed.toString()} units`);
-    console.log(`View on explorer: https://basescan.org/tx/${tx.hash}`); // Update based on chain
+    console.log(`View on explorer: ${getExplorerUrl(tx.hash, chain)}`);
 
     // 8. Check new balance
     const newBalance = await provider.getBalance(wallet.address);
@@ -210,7 +227,7 @@ export async function withdrawETHToNGN(ctx: Context, toAddress: string, amount: 
       fromAddress: wallet.address,
       toAddress: toAddress,
       amount: amount,
-      explorerUrl: `https://basescan.org/tx/${tx.hash}` // Update based on chain
+      explorerUrl: getExplorerUrl(tx.hash, chain)
     };
 
   } catch (error) {
@@ -355,7 +372,7 @@ export async function withdrawUSDCToNGN(ctx: Context, toAddress: string, amount:
 
     console.log(`✅ Transaction confirmed in block ${receipt?.blockNumber}`);
     console.log(`Gas used: ${receipt?.gasUsed.toString()} units`);
-    console.log(`View on explorer: https://basescan.org/tx/${tx.hash}`);
+    console.log(`View on explorer: ${getExplorerUrl(tx.hash, chain)}`);
 
     // 10. Check new balances
     const newBalance = await usdcContract.balanceOf(wallet.address);
@@ -372,7 +389,7 @@ export async function withdrawUSDCToNGN(ctx: Context, toAddress: string, amount:
       fromAddress: wallet.address,
       toAddress: toAddress,
       amount: amount,
-      explorerUrl: `https://basescan.org/tx/${tx.hash}`
+      explorerUrl: getExplorerUrl(tx.hash, chain)
     };
 
   } catch (error) {
@@ -517,7 +534,7 @@ export async function withdrawUSDTToNGN(ctx: Context, toAddress: string, amount:
 
     console.log(`✅ Transaction confirmed in block ${receipt?.blockNumber}`);
     console.log(`Gas used: ${receipt?.gasUsed.toString()} units`);
-    console.log(`View on explorer: https://basescan.org/tx/${tx.hash}`);
+    console.log(`View on explorer: ${getExplorerUrl(tx.hash, chain)}`);
 
     // 10. Check new balances
     const newBalance = await usdtContract.balanceOf(wallet.address);
@@ -534,7 +551,7 @@ export async function withdrawUSDTToNGN(ctx: Context, toAddress: string, amount:
       fromAddress: wallet.address,
       toAddress: toAddress,
       amount: amount,
-      explorerUrl: `https://basescan.org/tx/${tx.hash}`
+      explorerUrl: getExplorerUrl(tx.hash, chain)
     };
 
   } catch (error) {

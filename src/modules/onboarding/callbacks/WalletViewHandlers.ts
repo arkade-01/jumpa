@@ -2,6 +2,7 @@ import { Context } from "telegraf";
 import getUser from "@modules/users/getUserInfo";
 import { Markup } from "telegraf";
 import { getAllTokenBalances } from "@shared/utils/getTokenBalances";
+import { sendOrEdit } from "@shared/utils/messageHelper";
 
 export class WalletViewHandlers {
   // Handle view wallet callback
@@ -49,7 +50,7 @@ Set up a wallet to start trading!`;
           ],
         ]);
 
-        await ctx.reply(noWalletMessage, {
+        await sendOrEdit(ctx, noWalletMessage, {
           parse_mode: "HTML",
           ...keyboard,
         });
@@ -66,18 +67,13 @@ Set up a wallet to start trading!`;
         for (let index = 0; index < solanaWallets.length; index++) {
           const wallet = solanaWallets[index];
           const balance = wallet.balance?.toFixed(4) || "0.0000";
-          const lastUpdated = wallet.last_updated_balance
-            ? new Date(wallet.last_updated_balance).toLocaleDateString()
-            : "Never";
-
+          
           // Fetch USDC and USDT balances for this wallet
           const tokenBalances = await getAllTokenBalances(wallet.address);
 
           const defaultBadge = index === 0 ? " 🟢 <b>(Default)</b>\n" : "";
-          walletMessage += `\n<b>${index + 1}.</b> <code>${wallet.address}</code>${defaultBadge}\n`;
-          walletMessage += `   SOL: ${balance}   • USDC: ${tokenBalances.usdc.toFixed(1)}   • USDT: ${tokenBalances.usdt.toFixed(1)}\n`;
-          walletMessage += `   Updated: ${lastUpdated}\n`;
-        }
+          walletMessage += `\n<code>${wallet.address}</code>${defaultBadge}\n`;
+          walletMessage += `SOL: ${balance}   • USDC: ${tokenBalances.usdc.toFixed(1)}   • USDT: ${tokenBalances.usdt.toFixed(1)}\n`;        }
         walletMessage += `\n`;
       }
 
@@ -86,35 +82,11 @@ Set up a wallet to start trading!`;
         walletMessage += `<b>🔵 EVM Wallets (${evmWallets.length}/3)</b>\n`;
         evmWallets.forEach((wallet, index) => {
           const balance = wallet.balance?.toFixed(4) || "0.0000";
-          const lastUpdated = wallet.last_updated_balance
-            ? new Date(wallet.last_updated_balance).toLocaleDateString()
-            : "Never";
           const defaultBadge = index === 0 ? " 🟢 <b>(Default)</b>\n" : "";
-          walletMessage += `\n<b>${index + 1}.</b> <code>${wallet.address}</code>${defaultBadge}\n`;
-          walletMessage += `   Balance: ${balance} ETH\n`;
-          walletMessage += `   Updated: ${lastUpdated}\n`;
+          walletMessage += `\n<code>${wallet.address}</code>${defaultBadge}\n`;
+          walletMessage += `${balance} ETH\n`;
         });
         walletMessage += `\n`;
-      }
-
-      // Add summary
-      let totalSolBalance = 0;
-      for (const wallet of solanaWallets) {
-        totalSolBalance += Number(wallet.balance) || 0;
-      }
-
-      let totalEvmBalance = 0;
-      for (const wallet of evmWallets) {
-        totalEvmBalance += Number(wallet.balance) || 0;
-      }
-
-      walletMessage += `<b> Summary</b>\n`;
-      walletMessage += `Total Wallets: ${totalWallets}\n`;
-      if (solanaWallets.length > 0) {
-        walletMessage += `Total SOL: ${totalSolBalance.toFixed(4)} SOL\n`;
-      }
-      if (evmWallets.length > 0) {
-        walletMessage += `Total ETH: ${totalEvmBalance.toFixed(4)} ETH\n`;
       }
 
       // Build keyboard with set default buttons
@@ -190,7 +162,7 @@ Set up a wallet to start trading!`;
 
       const keyboard = Markup.inlineKeyboard(keyboardButtons);
 
-      await ctx.reply(walletMessage, {
+      await sendOrEdit(ctx, walletMessage, {
         parse_mode: "HTML",
         ...keyboard,
       });

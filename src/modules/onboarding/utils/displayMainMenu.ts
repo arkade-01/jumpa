@@ -7,11 +7,16 @@ import { getAllEvmBalances } from "@shared/utils/getEvmBalances";
 /**
  * Display the main menu with user's wallet balances
  * Used by both StartCommand and MenuHandlers for consistency
+ * @param ctx - Telegram context
+ * @param telegramId - User's Telegram ID
+ * @param username - User's username
+ * @param shouldEdit - Whether to edit existing message (true) or send new message (false)
  */
 export async function displayMainMenu(
   ctx: Context,
   telegramId: number,
-  username: string
+  username: string,
+  shouldEdit: boolean = true
 ): Promise<void> {
   // Get user from database
   const user = await getUser(telegramId, username);
@@ -45,10 +50,25 @@ Choose an option:`;
       [Markup.button.callback("📥 Import Existing Solana Wallet", "import_wallet")],
     ]);
 
-    await ctx.reply(setupMessage, {
-      parse_mode: "Markdown",
-      ...keyboard,
-    });
+    if (shouldEdit && ctx.callbackQuery) {
+      try {
+        await ctx.editMessageText(setupMessage, {
+          parse_mode: "Markdown",
+          ...keyboard,
+        });
+      } catch (error) {
+        // If edit fails (message too old or deleted), send new message
+        await ctx.reply(setupMessage, {
+          parse_mode: "Markdown",
+          ...keyboard,
+        });
+      }
+    } else {
+      await ctx.reply(setupMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
+    }
     return;
   }
 
@@ -123,8 +143,23 @@ ETH: ${evmBalances.BASE.eth.toFixed(4)}   • USDC: ${evmBalances.BASE.usdc.toFi
     [Markup.button.callback("🔄 Refresh", "back_to_menu")]
   ]);
 
-  await ctx.reply(welcomeMessage, {
-    parse_mode: "Markdown",
-    ...keyboard,
-  });
+  if (shouldEdit && ctx.callbackQuery) {
+    try {
+      await ctx.editMessageText(welcomeMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
+    } catch (error) {
+      // If edit fails (message too old or deleted), send new message
+      await ctx.reply(welcomeMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
+    }
+  } else {
+    await ctx.reply(welcomeMessage, {
+      parse_mode: "Markdown",
+      ...keyboard,
+    });
+  }
 }

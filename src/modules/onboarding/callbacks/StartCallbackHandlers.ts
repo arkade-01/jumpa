@@ -116,4 +116,9 @@ export class StartCallbackHandlers {
   static async handleBackToMenu(ctx: Context): Promise<void> {
     return MenuHandlers.handleBackToMenu(ctx);
   }
+
+  // Handle back to group menu callback
+  static async handleBackToGroupMenu(ctx: Context): Promise<void> {
+    return MenuHandlers.handleBackToGroupMenu(ctx);
+  }
 }

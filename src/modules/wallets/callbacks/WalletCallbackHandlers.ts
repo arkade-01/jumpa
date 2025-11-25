@@ -8,6 +8,7 @@ import { safeDeleteMessage } from "@shared/utils/messageUtils";
 import { clearWithdrawalState, getWithdrawalState, setWithdrawalState } from "@shared/state/withdrawalState";
 import { WalletViewHandlers } from "@modules/onboarding/callbacks/WalletViewHandlers";
 import { getUserBalances, formatBalances } from "@modules/onboarding/utils/getUserBalances";
+import { sendOrEdit } from "@shared/utils/messageHelper";
 
 export class WalletCallbackHandlers {
     static async handleDeposit(ctx: Context): Promise<void> {
@@ -39,11 +40,11 @@ export class WalletCallbackHandlers {
                 Markup.button.callback("🏧To NGN Bank Account", "withdraw_to_bank"),
                 Markup.button.callback("Set Withdrawal Pin", "set_withdrawal_pin"),
             ], [
-                Markup.button.callback("❌ Cancel", "delete_message"),
+                Markup.button.callback("🔙 Back to Main Menu", "back_to_menu"),
             ],]
         );
 
-        await ctx.reply("Where would you like to withdraw to? Make sure you have setup your withdrawal pin to avoid unauthorized withdrawals from your account", keyboard);
+        await sendOrEdit(ctx, "Where would you like to withdraw to? Make sure you have setup your withdrawal pin before proceeding", keyboard);
     }
 
     static async handleWithdrawToBank(ctx: Context): Promise<void> {
@@ -106,7 +107,7 @@ export class WalletCallbackHandlers {
             ],
         ]);
 
-        await ctx.reply(message, { parse_mode: "HTML", ...keyboard });
+        await sendOrEdit(ctx, message, { parse_mode: "HTML", ...keyboard });
     }
 
     static async handleWithdrawCurrencySelection(ctx: Context): Promise<void> {

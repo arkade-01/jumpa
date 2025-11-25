@@ -166,7 +166,8 @@ export async function joinGroup(params: JoinGroupParams) {
       throw new Error("Group owner not found");
     }
 
-    // Join group on-chain
+    // Join group on-chain first (if group has on-chain address)
+    let onChainSuccess = false;
     if (group.onchain_group_address) {
       console.log("Joining group on-chain...");
 
@@ -178,32 +179,42 @@ export async function joinGroup(params: JoinGroupParams) {
           memberName: user.username,
         });
         console.log(`On-chain join successful: ${onChainResult.signature}`);
+        onChainSuccess = true;
       } catch (error) {
         console.error("Failed to join group on-chain:", error);
 
         // Check if error is because user is already a member
         const errorMessage = error instanceof Error ? error.message : '';
         if (errorMessage.includes('already a member') || errorMessage.includes('Member profile exists')) {
-          console.log('User is already a member on-chain, will update database only');
+          console.log('User is already a member on-chain, will update database');
+          onChainSuccess = true; // Allow database update since they're already on-chain
         } else {
-          // For other errors, re-throw
+          // For other errors, throw and don't update database
           throw new Error(`Failed to join group on-chain: ${errorMessage}`);
         }
       }
+    } else {
+      // No on-chain address, so we can proceed with database-only
+      onChainSuccess = true;
     }
 
-    // Add user as member in database
-    group.members.push({
-      user_id: params.user_id,
-      role: "member",
-      contribution: params.contribution || 0,
-      joined_at: new Date(),
-    });
+    // Only add to database if on-chain join was successful (or no on-chain address)
+    if (onChainSuccess) {
+      // Add user as member in database
+      group.members.push({
+        user_id: params.user_id,
+        role: "member",
+        contribution: params.contribution || 0,
+        joined_at: new Date(),
+      });
 
-    await group.save();
+      await group.save();
 
-    console.log(`User ${params.user_id} joined group ${params.group_id}`);
-    return group;
+      console.log(`User ${params.user_id} joined group ${params.group_id}`);
+      return group;
+    } else {
+      throw new Error("Failed to join group - on-chain transaction did not succeed");
+    }
   } catch (error) {
     console.error("Error joining group:", error);
     throw error;
@@ -419,6 +430,7 @@ export async function updateMemberContribution(
  * Promote member to trader (database only, call addTraderToGroup for on-chain)
  */
 export async function promoteToTrader(group_id: string, user_id: number) {
+  console.log("promote to trader called")
   try {
     const group = await Group.findById(group_id);
     if (!group) {
@@ -462,11 +474,35 @@ export async function addTraderToGroup(
       throw new Error("Trader not found");
     }
 
+    console.log("Trader found:", {
+      telegram_id: trader.telegram_id,
+      username: trader.username,
+      hasWallets: !!trader.solanaWallets,
+      walletCount: trader.solanaWallets?.length || 0,
+      firstWalletAddress: trader.solanaWallets?.[0]?.address || 'none'
+    });
+
+    // Validate trader has a Solana wallet
+    if (!trader.solanaWallets || trader.solanaWallets.length === 0) {
+      throw new Error(
+        `User @${trader.username || trader_telegram_id} doesn't have a Solana wallet. ` +
+        `They need to use /start to create a wallet first.`
+      );
+    }
+
+    if (!trader.solanaWallets[0].address) {
+      throw new Error(
+        `User @${trader.username || trader_telegram_id} has an invalid wallet. ` +
+        `Please contact support.`
+      );
+    }
+
     if (!group.onchain_group_address) {
       throw new Error("Group has no on-chain address");
     }
 
     console.log("Adding trader on-chain...");
+    console.log("Trader wallet address:", trader.solanaWallets[0].address);
 
     try {
       const result = await addTraderOnChain({
@@ -485,6 +521,19 @@ export async function addTraderToGroup(
 
       // Check if error is because trader is already added
       const errorMessage = error instanceof Error ? error.message : '';
+
+      // Handle case where user hasn't joined the group on-chain
+      if (
+        errorMessage.includes('AccountNotInitialized') ||
+        errorMessage.includes('trader_profile')
+      ) {
+        throw new Error(
+          `User hasn't joined the group on-chain yet. ` +
+          `Ask them to leave the group (/leave_group) and rejoin using (/join ${group_id}) to sync their on-chain profile, ` +
+          `then try promoting them again.`
+        );
+      }
+
       if (
         errorMessage.includes('already a trader') ||
         errorMessage.includes('Trader already exists') ||
@@ -522,6 +571,19 @@ export async function removeTraderFromGroup(
     const trader = await User.findOne({ telegram_id: trader_telegram_id });
     if (!trader) {
       throw new Error("Trader not found");
+    }
+
+    // Validate trader has a Solana wallet
+    if (!trader.solanaWallets || trader.solanaWallets.length === 0) {
+      throw new Error(
+        `User @${trader.username || trader_telegram_id} doesn't have a Solana wallet.`
+      );
+    }
+
+    if (!trader.solanaWallets[0].address) {
+      throw new Error(
+        `User @${trader.username || trader_telegram_id} has an invalid wallet.`
+      );
     }
 
     if (!group.onchain_group_address) {

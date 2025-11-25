@@ -90,9 +90,8 @@ export const handleSelectWalletForExport = (ctx) => {
 };
 
 export const handleCancelExport = (ctx) => {
-  ctx.answerCbQuery();
+  ctx.answerCbQuery("Backup cancelled");
   ctx.deleteMessage();
-  ctx.reply("✅ Backup cancelled.");
 };
 
 export const handlePinForExport = async (ctx) => {

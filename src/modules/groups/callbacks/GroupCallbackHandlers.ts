@@ -15,6 +15,7 @@ import {
   getMemberFinancialSummary,
 } from "@modules/wallets/balanceService";
 import getUser from "@modules/users/getUserInfo";
+import { sendOrEdit } from "@shared/utils/messageHelper";
 
 export class GroupCallbackHandlers {
   // Handle create callback
@@ -65,7 +66,7 @@ With group trading, you and your members can:
         [Markup.button.callback("❓ Learn More", "group_help")],
       ]);
 
-      await ctx.reply(createGroupMessage, {
+      await sendOrEdit(ctx, createGroupMessage, {
         parse_mode: "Markdown",
         ...keyboard,
       });
@@ -129,7 +130,7 @@ With group trading, you and your members can:
         [Markup.button.callback("❓ How to Join", "join_help")],
       ]);
 
-      await ctx.reply(joinGroupMessage, {
+      await sendOrEdit(ctx, joinGroupMessage, {
         parse_mode: "Markdown",
         ...keyboard,
       });
@@ -155,7 +156,7 @@ With group trading, you and your members can:
       if (!group) {
         await ctx.reply(
           "❌ No group found in this chat.\n\n" +
-          "Use /create_group to create a new group or /join to join an existing one."
+            "Use /create_group to create a new group or /join to join an existing one."
         );
         return;
       }
@@ -195,10 +196,13 @@ With group trading, you and your members can:
           Markup.button.callback("💰 My Balance", "group_balance"),
           Markup.button.callback("📊 Group Stats", "group_stats"),
         ],
-        [Markup.button.callback("🔄 Refresh", "group_info")],
+        [
+          Markup.button.callback("🔄 Refresh", "group_info"),
+          Markup.button.callback("🔙 Back to Groups", "back_to_group_menu"),
+        ],
       ]);
 
-      await ctx.reply(infoMessage, {
+      await sendOrEdit(ctx, infoMessage, {
         parse_mode: "Markdown",
         ...keyboard,
       });
@@ -243,14 +247,20 @@ With group trading, you and your members can:
         const sharePercentage = shareInfo ? shareInfo.share_percentage : 0;
         const role = member.role === "trader" ? "🛠️ Trader" : "👤 Member";
 
-        membersMessage += `${index + 1}. ${role} - $${member.contribution
-          } (${sharePercentage}%)\n`;
+        membersMessage += `${index + 1}. ${role} - $${
+          member.contribution
+        } (${sharePercentage}%)\n`;
       });
 
       membersMessage += `\n**Total Balance:** ${group.current_balance} SOL`;
 
-      await ctx.reply(membersMessage, {
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, membersMessage, {
         parse_mode: "Markdown",
+        ...keyboard,
       });
     } catch (error) {
       console.error("members error:", error);
@@ -306,8 +316,13 @@ With group trading, you and your members can:
 *(Based on 10% profit assumption)*
       `;
 
-      await ctx.reply(balanceMessage, {
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, balanceMessage, {
         parse_mode: "Markdown",
+        ...keyboard,
       });
     } catch (error) {
       console.error("balance error:", error);
@@ -366,13 +381,19 @@ With group trading, you and your members can:
 \`/create_group DefiSquad 50 2\`
       `;
 
-      await ctx.reply(formMessage, { parse_mode: "Markdown" });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, formMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
     } catch (error) {
       console.error("Create group form error:", error);
       await ctx.answerCbQuery("❌ Failed to show create form.");
     }
   }
-
 
   static async handleCustomCreate(ctx: Context): Promise<void> {
     try {
@@ -395,7 +416,14 @@ With group trading, you and your members can:
 **Note:** You'll be the group creator and automatically become a trader!
       `;
 
-      await ctx.reply(customMessage, { parse_mode: "Markdown" });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, customMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
     } catch (error) {
       console.error("Custom create error:", error);
       await ctx.answerCbQuery("❌ Failed to show custom create.");
@@ -436,7 +464,14 @@ A group is where members pool funds for collective trading.
 • \`/poll trade <token> <amount>\` - Create trade poll
       `;
 
-      await ctx.reply(helpMessage, { parse_mode: "Markdown" });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, helpMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
     } catch (error) {
       console.error("help error:", error);
       await ctx.answerCbQuery("❌ Failed to show help.");
@@ -459,7 +494,14 @@ Public group browsing will be available in a future update.
 • Create your own group with the buttons above
       `;
 
-      await ctx.reply(browseMessage, { parse_mode: "Markdown" });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, browseMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
     } catch (error) {
       console.error("Browse groups error:", error);
       await ctx.answerCbQuery("❌ Failed to browse groups.");
@@ -485,7 +527,14 @@ Public group browsing will be available in a future update.
 • Group ID looks like: \`507f1f77bcf86cd799439011\`
       `;
 
-      await ctx.reply(joinMessage, { parse_mode: "Markdown" });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, joinMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
     } catch (error) {
       console.error("Join with ID error:", error);
       await ctx.answerCbQuery("❌ Failed to show join instructions.");
@@ -516,9 +565,9 @@ Public group browsing will be available in a future update.
         groupsMessage += "• Use the create buttons above";
       } else {
         userGroups.forEach((group, index) => {
-          const isTrader = group.members.find(
-            (m: any) => m.user_id === userId
-          )?.role === "trader";
+          const isTrader =
+            group.members.find((m: any) => m.user_id === userId)?.role ===
+            "trader";
           const role = isTrader ? "🛠️ Trader" : "👤 Member";
 
           groupsMessage += `${index + 1}. **${group.name}**\n`;
@@ -528,7 +577,14 @@ Public group browsing will be available in a future update.
         });
       }
 
-      await ctx.reply(groupsMessage, { parse_mode: "Markdown" });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, groupsMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
     } catch (error) {
       console.error("My groups error:", error);
       await ctx.answerCbQuery("❌ Failed to get your groups.");
@@ -564,7 +620,14 @@ Public group browsing will be available in a future update.
 • Group must be active (not ended)
       `;
 
-      await ctx.reply(helpMessage, { parse_mode: "Markdown" });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, helpMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
     } catch (error) {
       console.error("Join help error:", error);
       await ctx.answerCbQuery("❌ Failed to show join help.");
@@ -602,7 +665,9 @@ Public group browsing will be available in a future update.
 
 **📈 Performance:**
 • Total Trades: ${group.trades.length}
-• Successful Trades: ${executedPolls.filter((p: any) => p.type === "trade").length}
+• Successful Trades: ${
+        executedPolls.filter((p: any) => p.type === "trade").length
+      }
 • Active Polls: ${activePolls.length}
 • Total Polls: ${group.polls.length}
 
@@ -616,15 +681,23 @@ Public group browsing will be available in a future update.
 • Total Members: ${group.members.length}
 • Max Capacity: ${group.max_members}
 • Traders: ${group.members.filter((m: any) => m.role === "trader").length}
-• Regular Members: ${group.members.filter((m: any) => m.role === "member").length
-        }
+• Regular Members: ${
+        group.members.filter((m: any) => m.role === "member").length
+      }
 
 **⚙️ Settings:**
 • Group Status: ${group.status}
 • Created: ${new Date(group.created_at).toLocaleDateString()}
       `;
 
-      await ctx.reply(statsMessage, { parse_mode: "Markdown" });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, statsMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
     } catch (error) {
       console.error("Group stats error:", error);
       await ctx.answerCbQuery("❌ Failed to get group stats.");
@@ -669,7 +742,14 @@ Public group browsing will be available in a future update.
 • Status: ${group.status === "active" ? "🟢 Active" : "🔴 Ended"}
       `;
 
-      await ctx.reply(copyMessage, { parse_mode: "Markdown" });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, copyMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
     } catch (error) {
       console.error("Copy group ID error:", error);
       await ctx.answerCbQuery("❌ Failed to copy group ID.");
@@ -738,7 +818,7 @@ Once the bot is added to your Telegram group:
         [Markup.button.callback("🔄 Refresh", "add_bot_to_group")],
       ]);
 
-      await ctx.reply(addBotMessage, {
+      await sendOrEdit(ctx, addBotMessage, {
         parse_mode: "Markdown",
         ...keyboard,
       });
@@ -789,7 +869,14 @@ Once the bot is added to your Telegram group:
 • **Member**: Can vote on polls and contribute funds
       `;
 
-      await ctx.reply(commandsMessage, { parse_mode: "Markdown" });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, commandsMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
     } catch (error) {
       console.error("Bot commands help error:", error);
       await ctx.answerCbQuery("❌ Failed to show commands.");
@@ -838,7 +925,14 @@ The bot only needs these permissions to function properly. It won't:
 • Perform unauthorized actions
       `;
 
-      await ctx.reply(permissionsMessage, { parse_mode: "Markdown" });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
+      ]);
+
+      await sendOrEdit(ctx, permissionsMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
     } catch (error) {
       console.error("Bot permissions help error:", error);
       await ctx.answerCbQuery("❌ Failed to show permissions info.");
@@ -866,7 +960,7 @@ The bot only needs these permissions to function properly. It won't:
       }
 
       const managementMessage = `
-🎛️ **${group.name}**
+**${group.name}**
 
 **Group ID:** \`${group._id}\`
 **Status:** ${group.status === "active" ? "🟢 Active" : "🔴 Ended"}
@@ -884,10 +978,11 @@ The bot only needs these permissions to function properly. It won't:
         ],
         [
           Markup.button.callback("🔄 Refresh", "group_manage_refresh"),
-        ]
+          Markup.button.callback("🔙 Back to Main Menu", "back_to_menu"),
+        ],
       ]);
 
-      await ctx.reply(managementMessage, {
+      await sendOrEdit(ctx, managementMessage, {
         parse_mode: "Markdown",
         ...keyboard,
       });
@@ -937,17 +1032,21 @@ Select an action below:
         ],
         [
           Markup.button.callback("🔒 Add to Blacklist", "group_add_blacklist"),
-          Markup.button.callback("🔓 Remove from Blacklist", "group_remove_blacklist"),
+          Markup.button.callback(
+            "🔓 Remove from Blacklist",
+            "group_remove_blacklist"
+          ),
         ],
+        [Markup.button.callback("🔴 Close Group", "group_close")],
         [
-          Markup.button.callback("🔴 Close Group", "group_close"),
+          Markup.button.callback(
+            "⬅️ Back to Group Menu",
+            "group_manage_refresh"
+          ),
         ],
-        [
-          Markup.button.callback("⬅️ Back to Group Menu", "group_manage_refresh"),
-        ]
       ]);
 
-      await ctx.reply(moreActionsMessage, {
+      await sendOrEdit(ctx, moreActionsMessage, {
         parse_mode: "Markdown",
         ...keyboard,
       });
