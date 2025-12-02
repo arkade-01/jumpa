@@ -268,7 +268,7 @@ This wallet works on all EVM-compatible chains:
         [Markup.button.callback("🔙 Back to Wallets", "view_wallet")],
       ]);
 
-      await ctx.reply(successMessage, {
+      await sendOrEdit(ctx, successMessage, {
         parse_mode: "Markdown",
         ...keyboard,
       });
@@ -393,7 +393,7 @@ Your wallet has been added to your account!`;
         [Markup.button.callback("🔙 Back to Wallets", "view_wallet")],
       ]);
 
-      await ctx.reply(successMessage, {
+      await sendOrEdit(ctx, successMessage, {
         parse_mode: "Markdown",
         ...keyboard,
       });
@@ -475,7 +475,7 @@ Your wallet has been added to your account!`;
           [Markup.button.callback("🔙 Back", "view_wallet")],
         ]);
 
-        await ctx.reply(replyMessage, {
+        await sendOrEdit(ctx, replyMessage, {
           parse_mode: "Markdown",
           ...keyboard,
         });

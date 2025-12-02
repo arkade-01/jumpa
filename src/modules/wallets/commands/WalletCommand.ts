@@ -32,21 +32,39 @@ export class WalletCommand extends BaseCommand {
         return;
       }
 
-      // Fetch USDT and USDC token balance
-      const tokenBalances = await getAllTokenBalances(user.solanaWallets[0].address);
+      // Check if user has any wallets
+      const hasSolanaWallet = user.solanaWallets && user.solanaWallets.length > 0;
+      const hasEvmWallet = user.evmWallets && user.evmWallets.length > 0;
 
-      // Create wallet info message
-      const walletMessage = `
-🔑 **Your Solana Wallet**
+      if (!hasSolanaWallet && !hasEvmWallet) {
+        await this.sendMessage(
+          ctx,
+          "❌ You don't have any wallets yet. Please use /start to create or import a wallet."
+        );
+        return;
+      }
 
-📍 **Address:** \`${user.solanaWallets[0].address}\`
+      let walletMessage = "**Your Wallets**\n\n";
 
-SOL: ${(user.solanaWallets[0].balance).toFixed(4)}   • USDC: ${tokenBalances.usdc.toFixed(1)}   • USDT: ${tokenBalances.usdt.toFixed(1)}
+      // Add Solana wallet info if exists
+      if (hasSolanaWallet) {
+        const solWallet = user.solanaWallets[0];
+        const tokenBalances = await getAllTokenBalances(solWallet.address);
 
-📅 **Last Updated:** ${user.solanaWallets[0].last_updated_balance.toLocaleString()}
+        walletMessage += `**Solana Wallet**\n\n`;
+        walletMessage += ` **Address:** \`${solWallet.address}\`\n\n`;
+        walletMessage += `SOL: ${solWallet.balance.toFixed(4)}   • USDC: ${tokenBalances.usdc.toFixed(1)}   • USDT: ${tokenBalances.usdt.toFixed(1)}\n\n`;
+        walletMessage += `📅 **Last Updated:** ${solWallet.last_updated_balance.toLocaleString()}\n\n`;
+      }
 
-⚠️ **Security Note:** Keep your private key secure!
-      `;
+      // Add EVM wallet info if exists
+      if (hasEvmWallet) {
+        const evmWallet = user.evmWallets[0];
+        walletMessage += `**EVM Wallet**\n\n`;
+        walletMessage += `**Address:** \`${evmWallet.address}\`\n\n`;
+        walletMessage += `ETH: ${evmWallet.balance.toFixed(4)}\n\n`;
+        walletMessage += `📅 **Last Updated:** ${evmWallet.last_updated_balance.toLocaleString()}\n\n`;
+      }
 
       // Create inline keyboard with options
       const keyboard = Markup.inlineKeyboard([
@@ -54,7 +72,7 @@ SOL: ${(user.solanaWallets[0].balance).toFixed(4)}   • USDC: ${tokenBalances.u
           Markup.button.callback("🔄 Refresh Balance", "refresh_balance"),
         ],
         [
-          Markup.button.callback("🔐 Show Private Key", "show_private_key"),
+          Markup.button.callback("🔐 Export Private Key", "show_private_key"),
           Markup.button.callback("📊 Wallet Details", "wallet_details"),
         ],
         [Markup.button.callback("❌ Close", "close_wallet")],

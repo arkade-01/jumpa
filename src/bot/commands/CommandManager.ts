@@ -11,7 +11,6 @@ import { GroupPollsCommand } from "@modules/groups/commands/GroupPollsCommand";
 import { GroupBalanceCommand } from "@modules/groups/commands/GroupBalanceCommand";
 import { CheckGroupCommand } from "@modules/groups/commands/CheckGroupCommand";
 import { RecoverGroupCommand } from "@modules/groups/commands/RecoverGroupCommand";
-import { FundWalletCommand } from "@modules/wallets/commands/FundWalletCommand";
 import { PromoteTraderCommand } from "@modules/groups/commands/PromoteTraderCommand";
 import { LeaveGroupCommand } from "@modules/groups/commands/LeaveGroupCommand";
 import { DemoteTraderCommand } from "@modules/groups/commands/DemoteTraderCommand";
@@ -25,17 +24,34 @@ import { CloseGroupHandlers } from "@modules/groups/callbacks/CloseGroupHandlers
 import { ExitGroupHandlers } from "@modules/groups/callbacks/ExitGroupHandlers";
 import { DistributeProfitHandlers } from "@modules/groups/callbacks/DistributeProfitHandlers";
 import { BankHandler } from "@modules/payments/commands/BankHandler";
-import { getWithdrawalState, clearWithdrawalState } from "@shared/state/withdrawalState";
-import { handleDetectToken, handleGroupToken } from "@modules/trading/utils/DetectTokenAddress";
-import { handleBuy, handleGroupBuy } from "@modules/trading/commands/BuyCommand";
+import {
+  getWithdrawalState,
+  clearWithdrawalState,
+} from "@shared/state/withdrawalState";
+import {
+  handleDetectToken,
+  handleGroupToken,
+} from "@modules/trading/utils/DetectTokenAddress";
+import {
+  handleBuy,
+  handleGroupBuy,
+} from "@modules/trading/commands/BuyCommand";
 import { BuyCallbackHandlers } from "@modules/trading/callbacks/BuyCallbackHandlers";
 import { handleSell } from "@modules/trading/commands/SellCommand";
 import { SellCallbackHandlers } from "@modules/trading/callbacks/SellCallbackHandlers";
 import { handleBuyCustomAmountRequest } from "@modules/trading/callbacks/CustomAmountCallbackHandler";
-import { getUserActionState, clearUserActionState } from "@shared/state/userActionState";
+import {
+  getUserActionState,
+  clearUserActionState,
+} from "@shared/state/userActionState";
 import { createBuyOrder } from "@modules/trading/utils/createBuyOrder";
 import { handleRefresh } from "@bot/callbacks/RefreshCallbackHandler";
-import { handleExportPrivateKey, handleSelectWalletForExport, handleCancelExport, handlePinForExport } from "@modules/wallets/callbacks/ExportWalletCallbackHandler";
+import {
+  handleExportPrivateKey,
+  handleSelectWalletForExport,
+  handleCancelExport,
+  handlePinForExport,
+} from "@modules/wallets/callbacks/ExportWalletCallbackHandler";
 import { ReferralCommand } from "@modules/referral/commands/ReferralCommand";
 import { ImageTestCommand } from "@modules/onboarding/commands/ImageTestCommand";
 
@@ -63,7 +79,6 @@ export class CommandManager {
       new GroupBalanceCommand(),
       new CheckGroupCommand(),
       new RecoverGroupCommand(),
-      new FundWalletCommand(),
       new PromoteTraderCommand(),
       new LeaveGroupCommand(),
       new JoinGroupCommand(),
@@ -98,19 +113,49 @@ export class CommandManager {
     this.bot.action("show_help", StartCallbackHandlers.handleShowHelp);
     this.bot.action("show_about", StartCallbackHandlers.handleShowAbout);
     this.bot.action("back_to_menu", StartCallbackHandlers.handleBackToMenu);
-    this.bot.action("back_to_group_menu", StartCallbackHandlers.handleBackToGroupMenu);
-    this.bot.action("generate_wallet", StartCallbackHandlers.handleGenerateWallet);
+    this.bot.action(
+      "back_to_group_menu",
+      StartCallbackHandlers.handleBackToGroupMenu
+    );
+    this.bot.action(
+      "generate_wallet",
+      StartCallbackHandlers.handleGenerateWallet
+    );
     this.bot.action("import_wallet", StartCallbackHandlers.handleImportWallet);
     this.bot.action("add_wallet", StartCallbackHandlers.handleAddWallet);
-    this.bot.action("add_wallet_solana", StartCallbackHandlers.handleAddSolanaWallet);
+    this.bot.action(
+      "add_wallet_solana",
+      StartCallbackHandlers.handleAddSolanaWallet
+    );
     this.bot.action("add_wallet_evm", StartCallbackHandlers.handleAddEVMWallet);
-    this.bot.action("generate_evm_wallet", StartCallbackHandlers.handleGenerateEVMWallet);
-    this.bot.action(/set_default_solana:/, StartCallbackHandlers.handleSetDefaultSolanaWallet);
-    this.bot.action(/set_default_evm:/, StartCallbackHandlers.handleSetDefaultEVMWallet);
-    this.bot.action(/delete_solana_wallet:/, StartCallbackHandlers.handleDeleteSolanaWallet);
-    this.bot.action(/delete_evm_wallet:/, StartCallbackHandlers.handleDeleteEVMWallet);
-    this.bot.action(/confirm_delete_solana:/, StartCallbackHandlers.handleDeleteSolanaWallet);
-    this.bot.action(/confirm_delete_evm:/, StartCallbackHandlers.handleDeleteEVMWallet);
+    this.bot.action(
+      "generate_evm_wallet",
+      StartCallbackHandlers.handleGenerateEVMWallet
+    );
+    this.bot.action(
+      /set_default_solana:/,
+      StartCallbackHandlers.handleSetDefaultSolanaWallet
+    );
+    this.bot.action(
+      /set_default_evm:/,
+      StartCallbackHandlers.handleSetDefaultEVMWallet
+    );
+    this.bot.action(
+      /delete_solana_wallet:/,
+      StartCallbackHandlers.handleDeleteSolanaWallet
+    );
+    this.bot.action(
+      /delete_evm_wallet:/,
+      StartCallbackHandlers.handleDeleteEVMWallet
+    );
+    this.bot.action(
+      /confirm_delete_solana:/,
+      StartCallbackHandlers.handleDeleteSolanaWallet
+    );
+    this.bot.action(
+      /confirm_delete_evm:/,
+      StartCallbackHandlers.handleDeleteEVMWallet
+    );
 
     // Register referral callback handler
     this.bot.action("referral", async (ctx) => {
@@ -123,18 +168,39 @@ export class CommandManager {
     // Register callback handlers for exporting private key
     this.bot.action("export_private_key", handleExportPrivateKey);
     this.bot.action("show_private_key", handleExportPrivateKey); // Alias from /wallet command
-    this.bot.action(/^select_export_(sol|evm):\d+$/, handleSelectWalletForExport);
+    this.bot.action(
+      /^select_export_(sol|evm):\d+$/,
+      handleSelectWalletForExport
+    );
     this.bot.action("cancel_export", handleCancelExport);
 
     // Register callback handlers for wallet command
     this.bot.action("deposit_sol", WalletCallbackHandlers.handleDeposit);
     this.bot.action("withdraw_sol", WalletCallbackHandlers.handleWithdraw);
-    this.bot.action("withdraw_to_bank", WalletCallbackHandlers.handleWithdrawToBank);
-    this.bot.action("refresh_balance", WalletCallbackHandlers.handleRefreshBalance);
-    this.bot.action(/withdraw_currency:/, WalletCallbackHandlers.handleWithdrawCurrencySelection);
-    this.bot.action(/withdraw_custom_amount:/, WalletCallbackHandlers.handleWithdrawCustomAmount);
-    this.bot.action(/withdraw_amount:/, WalletCallbackHandlers.handleWithdrawAmount);
-    this.bot.action(/withdraw_confirm:/, WalletCallbackHandlers.handleWithdrawConfirmation);
+    this.bot.action(
+      "withdraw_to_bank",
+      WalletCallbackHandlers.handleWithdrawToBank
+    );
+    this.bot.action(
+      "refresh_balance",
+      WalletCallbackHandlers.handleRefreshBalance
+    );
+    this.bot.action(
+      /withdraw_currency:/,
+      WalletCallbackHandlers.handleWithdrawCurrencySelection
+    );
+    this.bot.action(
+      /withdraw_custom_amount:/,
+      WalletCallbackHandlers.handleWithdrawCustomAmount
+    );
+    this.bot.action(
+      /withdraw_amount:/,
+      WalletCallbackHandlers.handleWithdrawAmount
+    );
+    this.bot.action(
+      /withdraw_confirm:/,
+      WalletCallbackHandlers.handleWithdrawConfirmation
+    );
 
     // Register delete message action (reusable for any command)
     this.bot.action("delete_message", async (ctx) => {
@@ -175,33 +241,46 @@ export class CommandManager {
     //register buy and sell commands for groups
     this.bot.action(/^groupBuy:.+/, handleGroupBuy);
 
-
     //register callback handlers for bank account
+    this.bot.action("view_bank_account", BankHandler.getBankAccount);
+    this.bot.action("update_bank_name", BankHandler.updateBankName);
+
     this.bot.action(
-      "view_bank_account", BankHandler.getBankAccount
+      /update_bank_name:confirm:/,
+      BankHandler.handleBankNameConfirmation
     );
     this.bot.action(
-      "update_bank_name", BankHandler.updateBankName
+      "update_bank_name:cancel",
+      BankHandler.handleBankNameConfirmation
     );
 
-    this.bot.action(/update_bank_name:confirm:/, BankHandler.handleBankNameConfirmation);
-    this.bot.action("update_bank_name:cancel", BankHandler.handleBankNameConfirmation);
-
-    this.bot.action("final_confirmation:confirm", BankHandler.handleFinalConfirmation);
-    this.bot.action("final_confirmation:cancel", BankHandler.handleFinalConfirmation);
+    this.bot.action(
+      "final_confirmation:confirm",
+      BankHandler.handleFinalConfirmation
+    );
+    this.bot.action(
+      "final_confirmation:cancel",
+      BankHandler.handleFinalConfirmation
+    );
     //withdrawal pin handler
     this.bot.action("set_withdrawal_pin", BankHandler.handleSetWithdrawalPin);
-    this.bot.action(/set_withdrawal_pin:confirm:/, BankHandler.handleSetWithdrawalPinConfirmation);
-    this.bot.action("set_withdrawal_pin:cancel", BankHandler.handleSetWithdrawalPinConfirmation);
+    this.bot.action(
+      /set_withdrawal_pin:confirm:/,
+      BankHandler.handleSetWithdrawalPinConfirmation
+    );
+    this.bot.action(
+      "set_withdrawal_pin:cancel",
+      BankHandler.handleSetWithdrawalPinConfirmation
+    );
 
-    this.bot.on('text', async (ctx) => {
+    this.bot.on("text", async (ctx) => {
       const text = ctx.message.text;
-      console.log('Received text message:', text);
+      console.log("Received text message:", text);
       const userId = ctx.from?.id;
       if (!userId) return;
 
       const userAction = getUserActionState(userId);
-      if (userAction?.action === 'awaiting_custom_buy_amount') {
+      if (userAction?.action === "awaiting_custom_buy_amount") {
         const amount = parseFloat(text);
         if (isNaN(amount) || amount <= 0) {
           await ctx.reply("Invalid amount. Please enter a positive number.");
@@ -260,21 +339,22 @@ export class CommandManager {
       const withdrawalState = getWithdrawalState(userId);
       // if (!state && !withdrawalState) return;
       if (withdrawalState) {
-        if (withdrawalState.step === 'awaiting_custom_amount') {
+        if (withdrawalState.step === "awaiting_custom_amount") {
           await WalletCallbackHandlers.handleCustomAmountInput(ctx);
           return;
-        } else if (withdrawalState.step === 'awaiting_pin') {
+        } else if (withdrawalState.step === "awaiting_pin") {
           await WalletCallbackHandlers.handleWithdrawPinVerification(ctx);
           return;
         }
       }
 
       if (state) {
-        if (state.step === 'awaiting_bank_name') {
+        if (state.step === "awaiting_bank_name") {
           await BankHandler.handleBankNameSelection(ctx);
         } else {
           await BankHandler.handleBankUpdate(ctx);
-        } return;
+        }
+        return;
       }
       // Detect if a solana address is sent
       // Solana address pattern
@@ -282,9 +362,9 @@ export class CommandManager {
 
       // Check if it looks like a contract address
       if (solanaAddressRegex.test(text)) {
-        console.log('Detected potential Solana contract address:', text);
+        console.log("Detected potential Solana contract address:", text);
         // Check if message came from a group and call the group function
-        if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+        if (ctx.chat.type === "group" || ctx.chat.type === "supergroup") {
           // Call your group-specific function here
           await handleGroupToken(ctx, text);
         } else {
@@ -330,23 +410,50 @@ export class CommandManager {
     this.bot.action("group_deposit", DepositHandlers.handleDepositFunds);
     this.bot.action("deposit_custom", DepositHandlers.handleDepositCustom);
     this.bot.action("deposit_cancel", DepositHandlers.handleDepositCancel);
-    this.bot.action("group_manage_refresh", GroupCallbackHandlers.handleGroupManageRefresh);
-    this.bot.action("group_more_actions", GroupCallbackHandlers.handleMoreActions);
+    this.bot.action(
+      "group_manage_refresh",
+      GroupCallbackHandlers.handleGroupManageRefresh
+    );
+    this.bot.action(
+      "group_more_actions",
+      GroupCallbackHandlers.handleMoreActions
+    );
 
     // Register close group callback handlers
     this.bot.action("group_close", CloseGroupHandlers.handleCloseGroup);
-    this.bot.action("close_group_confirm", CloseGroupHandlers.handleCloseGroupConfirm);
-    this.bot.action("close_group_cancel", CloseGroupHandlers.handleCloseGroupCancel);
+    this.bot.action(
+      "close_group_confirm",
+      CloseGroupHandlers.handleCloseGroupConfirm
+    );
+    this.bot.action(
+      "close_group_cancel",
+      CloseGroupHandlers.handleCloseGroupCancel
+    );
 
     // Register exit group callback handlers
     this.bot.action("group_exit", ExitGroupHandlers.handleExitGroup);
-    this.bot.action("exit_group_confirm", ExitGroupHandlers.handleExitGroupConfirm);
-    this.bot.action("exit_group_cancel", ExitGroupHandlers.handleExitGroupCancel);
+    this.bot.action(
+      "exit_group_confirm",
+      ExitGroupHandlers.handleExitGroupConfirm
+    );
+    this.bot.action(
+      "exit_group_cancel",
+      ExitGroupHandlers.handleExitGroupCancel
+    );
 
     // Register distribute profit callback handlers
-    this.bot.action("group_distribute", DistributeProfitHandlers.handleDistributeProfit);
-    this.bot.action("distribute_custom", DistributeProfitHandlers.handleCustomAmount);
-    this.bot.action("distribute_cancel", DistributeProfitHandlers.handleDistributeCancel);
+    this.bot.action(
+      "group_distribute",
+      DistributeProfitHandlers.handleDistributeProfit
+    );
+    this.bot.action(
+      "distribute_custom",
+      DistributeProfitHandlers.handleCustomAmount
+    );
+    this.bot.action(
+      "distribute_cancel",
+      DistributeProfitHandlers.handleDistributeCancel
+    );
 
     // Register distribute profit member selection callbacks
     this.bot.action(/^distribute_select_member_(.+)$/, async (ctx) => {
@@ -390,16 +497,63 @@ export class CommandManager {
   }
 
   public async updateBotCommands(): Promise<void> {
-    const commandList = this.getAllCommands().map((command) => ({
-      command: command.name,
-      description: command.description,
-    }));
-
     try {
-      await this.bot.telegram.setMyCommands(commandList);
-      console.log("Bot commands updated successfully.");
+      // Define commands for private chats (user-focused)
+      const privateCommands = [
+        { command: "start", description: "Start the bot" },
+        { command: "help", description: "Get help" },
+        { command: "wallet", description: "Manage your wallet" },
+        { command: "referral", description: "View referral info" },
+        { command: "imagetest", description: "Test image features" },
+      ];
+
+      // Define commands for group chats (group management)
+      const groupCommands = [
+        { command: "start", description: "Start the bot" },
+        { command: "help", description: "Get help" },
+        { command: "group", description: "View group details" },
+        { command: "create_group", description: "Create a new trading group" },
+        { command: "join", description: "Join a trading group" },
+        { command: "info", description: "Show group information" },
+        { command: "members", description: "List group members" },
+        { command: "group_balance", description: "Check group balance" },
+        { command: "check_group", description: "Check group status" },
+        { command: "recover_group", description: "Recover group access" },
+        { command: "leave_group", description: "Leave the group" },
+      ];
+
+      // Define additional commands for group administrators
+      const groupAdminCommands = [
+        { command: "promotetrader", description: "Promote a member to trader" },
+        { command: "demotetrader", description: "Demote a trader" },
+      ];
+
+      // Set commands for private chats only
+      await this.bot.telegram.setMyCommands(privateCommands, {
+        scope: { type: "all_private_chats" },
+      });
+
+      // Set commands for all group chats
+      await this.bot.telegram.setMyCommands(groupCommands, {
+        scope: { type: "all_group_chats" },
+      });
+
+      // Set commands for group administrators (includes all group commands + admin commands)
+      await this.bot.telegram.setMyCommands(
+        [...groupCommands, ...groupAdminCommands],
+        { scope: { type: "all_chat_administrators" } }
+      );
+
+      console.log("✅ Bot commands updated successfully for all scopes:");
+      console.log(`  - Private chats: ${privateCommands.length} commands`);
+      console.log(`  - Group chats: ${groupCommands.length} commands`);
+      console.log(
+        `  - Group admins: ${
+          groupCommands.length + groupAdminCommands.length
+        } commands`
+      );
     } catch (error) {
-      console.error("Failed to update bot commands:", error);
+      console.error("❌ Failed to update bot commands:", error);
     }
   }
 

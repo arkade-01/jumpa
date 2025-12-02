@@ -39,10 +39,7 @@ export class ProfileHandlers {
       const profileMessage = `
       <b>📊 Your Profile</b>
 
-<b>Wallet Address:</b> ${hasSolanaWallet ? `<code>${user.solanaWallets[0].address}</code>` : "Wallet not set"}
-
-<b>Balance:</b> ${hasSolanaWallet ? `${(user.solanaWallets[0].balance).toFixed(4)} SOL` : "N/A"}
-
+<b>Username:</b> @${username}
 <b>Member Since:</b> ${user.created_at?.toLocaleString() || "Unknown"}
 
 <b>Groups:</b> ${userGroups.length}

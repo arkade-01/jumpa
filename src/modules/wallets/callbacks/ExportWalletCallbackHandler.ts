@@ -1,7 +1,11 @@
-import { Markup } from 'telegraf';
-import { decryptPrivateKey } from '@shared/utils/encryption';
-import { getUserActionState, setUserActionState, clearUserActionState } from '@shared/state/userActionState';
-import getUser from '@modules/users/getUserInfo';
+import { Markup } from "telegraf";
+import { decryptPrivateKey } from "@shared/utils/encryption";
+import {
+  getUserActionState,
+  setUserActionState,
+  clearUserActionState,
+} from "@shared/state/userActionState";
+import getUser from "@modules/users/getUserInfo";
 
 export const handleExportPrivateKey = async (ctx) => {
   ctx.answerCbQuery();
@@ -19,20 +23,26 @@ export const handleExportPrivateKey = async (ctx) => {
     // Add Solana wallet export buttons
     if (user.solanaWallets && user.solanaWallets.length > 0) {
       user.solanaWallets.forEach((wallet, index) => {
-        const label = index === 0
-          ? `🔑 Export SOL Wallet ${index + 1} (Default)`
-          : `🔑 Export SOL Wallet ${index + 1}`;
-        buttons.push([Markup.button.callback(label, `select_export_sol:${index}`)]);
+        const label =
+          index === 0
+            ? `🔑 Export SOL Wallet ${index + 1} (Default)`
+            : `🔑 Export SOL Wallet ${index + 1}`;
+        buttons.push([
+          Markup.button.callback(label, `select_export_sol:${index}`),
+        ]);
       });
     }
 
     // Add EVM wallet export buttons
     if (user.evmWallets && user.evmWallets.length > 0) {
       user.evmWallets.forEach((wallet, index) => {
-        const label = index === 0
-          ? `🔑 Export EVM Wallet ${index + 1} (Default)`
-          : `🔑 Export EVM Wallet ${index + 1}`;
-        buttons.push([Markup.button.callback(label, `select_export_evm:${index}`)]);
+        const label =
+          index === 0
+            ? `🔑 Export EVM Wallet ${index + 1} (Default)`
+            : `🔑 Export EVM Wallet ${index + 1}`;
+        buttons.push([
+          Markup.button.callback(label, `select_export_evm:${index}`),
+        ]);
       });
     }
 
@@ -47,8 +57,8 @@ export const handleExportPrivateKey = async (ctx) => {
     ctx.reply(
       "🔐 *Select a wallet to export*\n\n⚠️ *Warning:* Exporting your private key can expose your funds to theft if the key is misplaced or seen by others.",
       {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(buttons)
+        parse_mode: "Markdown",
+        ...Markup.inlineKeyboard(buttons),
       }
     );
   } catch (error) {
@@ -67,11 +77,11 @@ export const handleSelectWalletForExport = (ctx) => {
   const callbackData = ctx.callbackQuery.data;
   console.log("Callback data:", callbackData);
 
-  const parts = callbackData.split(':');
+  const parts = callbackData.split(":");
   console.log("Split parts:", parts);
 
   // Extract wallet type from the first part (e.g., "select_export_sol" -> "sol")
-  const walletType = parts[0].replace('select_export_', ''); // 'sol' or 'evm'
+  const walletType = parts[0].replace("select_export_", ""); // 'sol' or 'evm'
   const walletIndex = parseInt(parts[1], 10);
 
   console.log("Wallet type:", walletType, "Wallet index:", walletIndex);
@@ -79,13 +89,13 @@ export const handleSelectWalletForExport = (ctx) => {
   ctx.deleteMessage();
   ctx.reply(
     "⚠️ *Warning:* You are about to export your private key. This is a sensitive operation.\n\n🔒 Enter your withdrawal PIN to continue.",
-    { parse_mode: 'Markdown' }
+    { parse_mode: "Markdown" }
   );
 
   setUserActionState(ctx.from.id, {
     action: "awaiting_export_pin",
-    walletType: walletType as 'sol' | 'evm',
-    walletIndex: walletIndex
+    walletType: walletType as "sol" | "evm",
+    walletIndex: walletIndex,
   });
 };
 
@@ -111,22 +121,38 @@ export const handlePinForExport = async (ctx) => {
         return;
       }
 
-      if (user.bank_details.withdrawalPin !== pin) {
-        ctx.reply("❌ Incorrect PIN. Export cancelled for security. Please restart the process.");
+      if (!user.bank_details.withdrawalPin) {
+        ctx.reply("❌ Please setup your withdrawal pin and try again.");
+        clearUserActionState(userId);
+        return;
+      } else if (user.bank_details.withdrawalPin !== pin) {
+        ctx.reply(
+          "❌ Incorrect PIN. Export cancelled for security. Please restart the process."
+        );
         clearUserActionState(userId);
         return;
       }
-
       // PIN is correct, proceed with export
       const { walletType, walletIndex } = userAction;
 
-      console.log("Exporting wallet - Type:", walletType, "Index:", walletIndex);
-      console.log("User has", user.solanaWallets?.length || 0, "Solana wallets");
+      console.log(
+        "Exporting wallet - Type:",
+        walletType,
+        "Index:",
+        walletIndex
+      );
+      console.log(
+        "User has",
+        user.solanaWallets?.length || 0,
+        "Solana wallets"
+      );
       console.log("User has", user.evmWallets?.length || 0, "EVM wallets");
 
       // Validate that we have the required data
       if (!walletType || walletIndex === undefined) {
-        ctx.reply("❌ Wallet selection data missing. Please restart the export process.");
+        ctx.reply(
+          "❌ Wallet selection data missing. Please restart the export process."
+        );
         clearUserActionState(userId);
         return;
       }
@@ -134,18 +160,28 @@ export const handlePinForExport = async (ctx) => {
       let wallet;
       let walletLabel;
 
-      if (walletType === 'sol') {
+      if (walletType === "sol") {
         if (!user.solanaWallets || walletIndex >= user.solanaWallets.length) {
-          console.log("Solana wallet not found - Index:", walletIndex, "Array length:", user.solanaWallets?.length);
+          console.log(
+            "Solana wallet not found - Index:",
+            walletIndex,
+            "Array length:",
+            user.solanaWallets?.length
+          );
           ctx.reply("❌ Solana wallet not found. Please try again.");
           clearUserActionState(userId);
           return;
         }
         wallet = user.solanaWallets[walletIndex];
         walletLabel = `SOL Wallet ${walletIndex + 1}`;
-      } else if (walletType === 'evm') {
+      } else if (walletType === "evm") {
         if (!user.evmWallets || walletIndex >= user.evmWallets.length) {
-          console.log("EVM wallet not found - Index:", walletIndex, "Array length:", user.evmWallets?.length);
+          console.log(
+            "EVM wallet not found - Index:",
+            walletIndex,
+            "Array length:",
+            user.evmWallets?.length
+          );
           ctx.reply("❌ EVM wallet not found. Please try again.");
           clearUserActionState(userId);
           return;
@@ -168,10 +204,10 @@ export const handlePinForExport = async (ctx) => {
 
       const message = await ctx.reply(
         `🔑 *${walletLabel} Private Key*\n\n` +
-        `\`${privateKey}\`\n\n` +
-        `📍 Address: \`${wallet.address}\`\n\n` +
-        `⏱️ *This message will be deleted in 15 seconds.*`,
-        { parse_mode: 'Markdown' }
+          `\`${privateKey}\`\n\n` +
+          `📍 Address: \`${wallet.address}\`\n\n` +
+          `⏱️ *This message will be deleted in 15 seconds.*`,
+        { parse_mode: "Markdown" }
       );
 
       // Delete the user's PIN message for security
@@ -189,7 +225,6 @@ export const handlePinForExport = async (ctx) => {
           console.error("Could not delete private key message:", error);
         }
       }, 15000);
-
     } catch (error) {
       console.error("Error during private key export:", error);
       ctx.reply("❌ An error occurred. Please try again later.");

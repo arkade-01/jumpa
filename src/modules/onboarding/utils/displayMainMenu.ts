@@ -3,20 +3,18 @@ import { Markup } from "telegraf";
 import getUser from "@modules/users/getUserInfo";
 import { getAllTokenBalances } from "@shared/utils/getTokenBalances";
 import { getAllEvmBalances } from "@shared/utils/getEvmBalances";
+import { sendOrEdit } from "@shared/utils/messageHelper";
 
 /**
  * Display the main menu with user's wallet balances
  * Used by both StartCommand and MenuHandlers for consistency
  * @param ctx - Telegram context
  * @param telegramId - User's Telegram ID
- * @param username - User's username
- * @param shouldEdit - Whether to edit existing message (true) or send new message (false)
- */
+ * @param username - User's username */
 export async function displayMainMenu(
   ctx: Context,
   telegramId: number,
-  username: string,
-  shouldEdit: boolean = true
+  username: string
 ): Promise<void> {
   // Get user from database
   const user = await getUser(telegramId, username);
@@ -56,25 +54,19 @@ Choose an option below to get started:`;
       ],
     ]);
 
-    if (shouldEdit && ctx.callbackQuery) {
-      try {
-        await ctx.editMessageText(setupMessage, {
-          parse_mode: "Markdown",
-          ...keyboard,
-        });
-      } catch (error) {
-        // If edit fails (message too old or deleted), send new message
-        await ctx.reply(setupMessage, {
-          parse_mode: "Markdown",
-          ...keyboard,
-        });
-      }
-    } else {
-      await ctx.reply(setupMessage, {
+    try {
+      await sendOrEdit(ctx, setupMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
+    } catch (error) {
+      // If edit fails (message too old or deleted), send new message
+      await sendOrEdit(ctx, setupMessage, {
         parse_mode: "Markdown",
         ...keyboard,
       });
     }
+
     return;
   }
 
@@ -154,32 +146,24 @@ ETH: ${evmBalances.BASE.eth.toFixed(
     ],
     [Markup.button.callback(" Group Info", "group_info")],
     [
-      Markup.button.callback("Deposit", "deposit_sol"),
       Markup.button.callback("Withdraw", "withdraw_sol"),
+      Markup.button.callback("Referral", "referral"),
     ],
     [
       Markup.button.callback(" Help & Commands", "show_help"),
       Markup.button.callback(" About Jumpa", "show_about"),
     ],
-    [Markup.button.callback("Referral", "referral")],
     [Markup.button.callback("🔄 Refresh", "back_to_menu")],
   ]);
 
-  if (shouldEdit && ctx.callbackQuery) {
-    try {
-      await ctx.editMessageText(welcomeMessage, {
-        parse_mode: "Markdown",
-        ...keyboard,
-      });
-    } catch (error) {
-      // If edit fails (message too old or deleted), send new message
-      await ctx.reply(welcomeMessage, {
-        parse_mode: "Markdown",
-        ...keyboard,
-      });
-    }
-  } else {
-    await ctx.reply(welcomeMessage, {
+  try {
+    await sendOrEdit(ctx, welcomeMessage, {
+      parse_mode: "Markdown",
+      ...keyboard,
+    });
+  } catch (error) {
+    // If edit fails (message too old or deleted), send new message
+    await sendOrEdit(ctx, welcomeMessage, {
       parse_mode: "Markdown",
       ...keyboard,
     });
