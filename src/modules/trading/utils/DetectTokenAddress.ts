@@ -26,6 +26,7 @@ export async function generateTokenInfoMessage(contractAddress: string) {
   const jupUrl = `https://lite-api.jup.ag/ultra/v1/search?query=${contractAddress}`;
   const response = await fetch(jupUrl);
   if (!response.ok) {
+    console.log("Jup response:", response);
     throw new Error("Failed to fetch token data from Jupiter.");
   }
 
