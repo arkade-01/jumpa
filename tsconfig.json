@@ -127,7 +127,7 @@
   "include": [
     "src/**/*",
     "src/index.ts"
-  ],
+, "scripts/getBankCode.js"  ],
   "exclude": [
     "node_modules",
     "dist",

@@ -131,7 +131,7 @@ export class DefaultWalletHandlers {
         const solanaButtons = [];
         for (let i = 1; i < solanaWallets.length; i++) {
           solanaButtons.push(
-            Markup.button.callback(`⭐ Set Wallet ${i + 1} as Main`, `set_default_solana:${i}`)
+            Markup.button.callback(`Set Wallet ${i + 1} as Main`, `set_default_solana:${i}`)
           );
         }
         // Add buttons in rows of 2
@@ -145,7 +145,7 @@ export class DefaultWalletHandlers {
         const evmButtons = [];
         for (let i = 1; i < evmWallets.length; i++) {
           evmButtons.push(
-            Markup.button.callback(`⭐ Set EVM ${i + 1} as Main`, `set_default_evm:${i}`)
+            Markup.button.callback(`Set EVM ${i + 1} as Main`, `set_default_evm:${i}`)
           );
         }
         // Add buttons in rows of 2
@@ -159,7 +159,7 @@ export class DefaultWalletHandlers {
         const deleteButtons = [];
         for (let i = 0; i < solanaWallets.length; i++) {
           deleteButtons.push(
-            Markup.button.callback(`🗑️ Delete Sol Wallet ${i + 1}`, `delete_solana_wallet:${i}`)
+            Markup.button.callback(`Delete Sol Wallet ${i + 1}`, `delete_solana_wallet:${i}`)
           );
         }
         // Add buttons in rows of 2
@@ -173,7 +173,7 @@ export class DefaultWalletHandlers {
         const deleteButtons = [];
         for (let i = 0; i < evmWallets.length; i++) {
           deleteButtons.push(
-            Markup.button.callback(`🗑️ Delete EVM ${i + 1}`, `delete_evm_wallet:${i}`)
+            Markup.button.callback(`Delete EVM ${i + 1}`, `delete_evm_wallet:${i}`)
           );
         }
         // Add buttons in rows of 2
@@ -184,11 +184,10 @@ export class DefaultWalletHandlers {
 
       keyboardButtons.push(
         [
-          Markup.button.callback("💳 Deposit", "deposit_sol"),
           Markup.button.callback("💸 Withdraw", "withdraw_sol"),
+          Markup.button.callback("📊 My Profile", "view_profile"),
         ],
         [
-          Markup.button.callback("📊 My Profile", "view_profile"),
           Markup.button.callback("🔙 Back to Menu", "back_to_menu"),
         ]
       );
@@ -333,7 +332,7 @@ export class DefaultWalletHandlers {
         const solanaButtons = [];
         for (let i = 1; i < solanaWallets.length; i++) {
           solanaButtons.push(
-            Markup.button.callback(`⭐ Set Wallet ${i + 1} as Main`, `set_default_solana:${i}`)
+            Markup.button.callback(`Set Wallet ${i + 1} as Main`, `set_default_solana:${i}`)
           );
         }
         // Add buttons in rows of 2
@@ -361,7 +360,7 @@ export class DefaultWalletHandlers {
         const deleteButtons = [];
         for (let i = 0; i < solanaWallets.length; i++) {
           deleteButtons.push(
-            Markup.button.callback(`🗑️ Delete Sol Wallet ${i + 1}`, `delete_solana_wallet:${i}`)
+            Markup.button.callback(`Delete Sol Wallet ${i + 1}`, `delete_solana_wallet:${i}`)
           );
         }
         // Add buttons in rows of 2
@@ -375,7 +374,7 @@ export class DefaultWalletHandlers {
         const deleteButtons = [];
         for (let i = 0; i < evmWallets.length; i++) {
           deleteButtons.push(
-            Markup.button.callback(`🗑️ Delete EVM ${i + 1}`, `delete_evm_wallet:${i}`)
+            Markup.button.callback(`Delete EVM ${i + 1}`, `delete_evm_wallet:${i}`)
           );
         }
         // Add buttons in rows of 2
@@ -386,11 +385,10 @@ export class DefaultWalletHandlers {
 
       keyboardButtons.push(
         [
-          Markup.button.callback("💳 Deposit", "deposit_sol"),
           Markup.button.callback("💸 Withdraw", "withdraw_sol"),
+          Markup.button.callback("📊 My Profile", "view_profile"),
         ],
         [
-          Markup.button.callback("📊 My Profile", "view_profile"),
           Markup.button.callback("🔙 Back to Menu", "back_to_menu"),
         ]
       );

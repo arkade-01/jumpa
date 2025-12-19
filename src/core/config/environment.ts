@@ -15,5 +15,7 @@ export const config = {
   encryptionKey: process.env.ENCRYPTION_KEY || "",
   alchemyDevnetRpc: process.env.ALCHEMY_DEVNET_RPC || "",
   alchemyMainnetRpc: process.env.ALCHEMY_MAINNET_RPC || "",
+  geminiApiKey: process.env.GEMINI_API_KEY || "",
+  paystackBearerKey: process.env.PAYSTACK_BEARER_KEY || "",
 
 };

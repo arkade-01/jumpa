@@ -2,8 +2,8 @@ import { Context, Markup } from "telegraf";
 import getUser from "@features/users/getUserInfo";
 import { config } from "@core/config/environment";
 import Withdrawal from "@core/database/models/withdrawal";
-import { WithdrawSolToNgn, WithdrawUSDCToNgn, WithdrawUSDTToNgn } from "@features/payments/commands/WithdrawToNgn";
-import { withdrawETHToNGN, withdrawUSDCToNGN as withdrawUSDCToNGNEVM, withdrawUSDTToNGN as withdrawUSDTToNGNEVM } from "@features/payments/commands/EvmWithdrawal";
+import { executeSolTransfer, executeUSDCTransfer, executeUSDTTransfer } from "@features/payments/utils/solWithdrawTx";
+import { executeETHTransfer, executeUSDCTransferEVM, executeUSDTTransferEVM } from "@features/payments/utils/evmWithdrawTx";
 import { safeDeleteMessage } from "@shared/utils/messageUtils";
 import { clearWithdrawalState, getWithdrawalState, setWithdrawalState } from "@shared/state/withdrawalState";
 import { WalletViewHandlers } from "@features/onboarding/callbacks/WalletViewHandlers";
@@ -12,37 +12,6 @@ import { sendOrEdit } from "@shared/utils/messageHelper";
 import { generateTransactionReceipt } from "@shared/utils/receiptGenerator";
 
 export class WalletCallbackHandlers {
-    static async handleDeposit(ctx: Context): Promise<void> {
-      const telegramId = ctx.from?.id;
-      const username = ctx.from?.username || ctx.from?.first_name || "Unknown";
-
-      if (!telegramId) {
-        await ctx.answerCbQuery("❌ Unable to identify your account.");
-        return;
-      }
-
-      const user = await getUser(telegramId, username);
-
-      if (!user) {
-        await ctx.reply(
-          "❌ User not found. Please use /start to register first."
-        );
-        return;
-      }
-
-      const message = `The deposit feature is still in progress
-        
-        `;
-      const keyboard = Markup.inlineKeyboard([
-        [
-          Markup.button.callback("Wallet1", "coming_soon_001"),
-          Markup.button.callback("Set Withdrawal Pin", "set_withdrawal_pin"),
-        ],
-        [Markup.button.callback("🔙 Back", "back_to_menu")],
-      ]);
-
-      await sendOrEdit(ctx, message, { parse_mode: "HTML", ...keyboard });
-    }
 
     static async handleWithdraw(ctx: Context): Promise<void> {
         const keyboard = Markup.inlineKeyboard(
@@ -567,12 +536,12 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
                 console.log(`Recipient address (${chain}): ${recipientAddress}`);
 
                 const saveTxtoDb = await Withdrawal.create({
-                  telegram_id: ctx.from?.id,
-                  transaction_id: paymentWidget.data.id,
-                  fiatPayoutAmount: fiatPayoutAmount,
+                    telegram_id: ctx.from?.id,
+                    transaction_id: paymentWidget.data.id,
+                    fiatPayoutAmount: fiatPayoutAmount,
                     depositAmount: depositAmount,
                     yaraWalletAddress: recipientAddress,
-                  status:paymentStatus,
+                    status: paymentStatus,
                 });
                 console.log("withdrawal saved to db: ", saveTxtoDb)
 
@@ -581,11 +550,11 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
                 if (chain === 'SOLANA') {
                     console.log(`[WITHDRAWAL] Executing Solana ${currency} withdrawal`);
                     if (currency === 'SOL') {
-                        initTx = await WithdrawSolToNgn(ctx, recipientAddress, depositAmount);
+                        initTx = await executeSolTransfer(user, recipientAddress, depositAmount);
                     } else if (currency === 'USDC') {
-                        initTx = await WithdrawUSDCToNgn(ctx, recipientAddress, depositAmount);
+                        initTx = await executeUSDCTransfer(user, recipientAddress, depositAmount);
                     } else if (currency === 'USDT') {
-                        initTx = await WithdrawUSDTToNgn(ctx, recipientAddress, depositAmount);
+                        initTx = await executeUSDTTransfer(user, recipientAddress, depositAmount);
                     } else {
                         await ctx.reply(`❌ Unsupported Solana currency: ${currency}`);
                         return;
@@ -593,11 +562,11 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
                 } else if (chain === 'BASE' || chain === 'CELO') {
                     console.log(`[WITHDRAWAL] Executing ${chain} ${currency} withdrawal`);
                     if (currency === 'ETH') {
-                        initTx = await withdrawETHToNGN(ctx, recipientAddress, depositAmount, chain);
+                        initTx = await executeETHTransfer(user, recipientAddress, depositAmount, chain);
                     } else if (currency === 'USDC') {
-                        initTx = await withdrawUSDCToNGNEVM(ctx, recipientAddress, depositAmount, chain);
+                        initTx = await executeUSDCTransferEVM(user, recipientAddress, depositAmount, chain);
                     } else if (currency === 'USDT') {
-                        initTx = await withdrawUSDTToNGNEVM(ctx, recipientAddress, depositAmount, chain);
+                        initTx = await executeUSDTTransferEVM(user, recipientAddress, depositAmount, chain);
                     } else {
                         await ctx.reply(`❌ Unsupported ${chain} currency: ${currency}`);
                         return;
@@ -616,7 +585,7 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
                     // Generate and send receipt
                     try {
                         const receiptData = {
-                            amount: fiatPayoutAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}),
+                            amount: fiatPayoutAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
                             amountInCrypto: depositAmount.toString(),
                             currency: currency,
                             timestamp: new Date(),

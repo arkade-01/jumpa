@@ -102,7 +102,7 @@ Set up a wallet to start trading!`;
         const solanaButtons = [];
         for (let i = 1; i < solanaWallets.length; i++) {
           solanaButtons.push(
-            Markup.button.callback(`⭐ Set SOL Wallet ${i + 1} as Main`, `set_default_solana:${i}`)
+            Markup.button.callback(`Set SOL Wallet ${i + 1} as Main`, `set_default_solana:${i}`)
           );
         }
         // Add buttons in rows of 2
@@ -116,7 +116,7 @@ Set up a wallet to start trading!`;
         const evmButtons = [];
         for (let i = 1; i < evmWallets.length; i++) {
           evmButtons.push(
-            Markup.button.callback(`⭐ Set EVM ${i + 1} as Main`, `set_default_evm:${i}`)
+            Markup.button.callback(`Set EVM ${i + 1} as Main`, `set_default_evm:${i}`)
           );
         }
         // Add buttons in rows of 2
@@ -130,7 +130,7 @@ Set up a wallet to start trading!`;
         const deleteButtons = [];
         for (let i = 0; i < solanaWallets.length; i++) {
           deleteButtons.push(
-            Markup.button.callback(`🗑️ Delete Sol Wallet ${i + 1}`, `delete_solana_wallet:${i}`)
+            Markup.button.callback(`Delete Sol Wallet ${i + 1}`, `delete_solana_wallet:${i}`)
           );
         }
         // Add buttons in rows of 2

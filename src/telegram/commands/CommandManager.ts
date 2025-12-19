@@ -16,6 +16,7 @@ import {
   getWithdrawalState,
   clearWithdrawalState,
 } from "@shared/state/withdrawalState";
+import { getAIWithdrawalState } from "@shared/state/aiWithdrawalState";
 import {
   handleDetectToken,
   handleGroupToken,
@@ -46,6 +47,7 @@ import { CreateGroupCommand } from "@features/groups/commands/CreateGroupCommand
 import { GroupCommand } from "@features/groups/commands/GroupCommand";
 import { GroupInfoCommand } from "@features/groups/commands/GroupInfoCommand";
 import { LeaveGroupCommand } from "@features/groups/commands/LeaveGroupCommand";
+import { AICallbackHandler } from "@features/payments/callbacks/AIWithdrawalCallback";
 
 export class CommandManager {
   private commands: Map<string, BaseCommand> = new Map();
@@ -160,7 +162,6 @@ export class CommandManager {
     this.bot.action("cancel_export", handleCancelExport);
 
     // Register callback handlers for wallet command
-    this.bot.action("deposit_sol", WalletCallbackHandlers.handleDeposit);
     this.bot.action("withdraw_sol", WalletCallbackHandlers.handleWithdraw);
     this.bot.action(
       "withdraw_to_bank",
@@ -171,20 +172,34 @@ export class CommandManager {
       WalletCallbackHandlers.handleRefreshBalance
     );
     this.bot.action(
-      /withdraw_currency:/,
+      /^withdraw_currency:(?!.*ai_)/,
       WalletCallbackHandlers.handleWithdrawCurrencySelection
     );
     this.bot.action(
-      /withdraw_custom_amount:/,
+      /^withdraw_custom_amount:/,
       WalletCallbackHandlers.handleWithdrawCustomAmount
     );
     this.bot.action(
-      /withdraw_amount:/,
+      /^withdraw_amount:/,
       WalletCallbackHandlers.handleWithdrawAmount
     );
     this.bot.action(
-      /withdraw_confirm:/,
+      /^withdraw_confirm:/,
       WalletCallbackHandlers.handleWithdrawConfirmation
+    );
+
+    // Register AI withdrawal callback handlers
+    this.bot.action(
+      /^ai_withdraw_chain:/,
+      AICallbackHandler.handleChainSelection
+    );
+    this.bot.action(
+      /^ai_withdraw_currency:/,
+      AICallbackHandler.handleCurrencySelection
+    );
+    this.bot.action(
+      "ai_withdraw_cancel",
+      AICallbackHandler.handleWithdrawalCancellation
     );
 
     // Register delete message action (reusable for any command)
@@ -358,6 +373,25 @@ export class CommandManager {
         }
         return;
       }
+
+      // Handle AI withdrawal bank name input
+      const aiWithdrawalState = getAIWithdrawalState(userId);
+      if (aiWithdrawalState?.step === "awaiting_bank_name") {
+        await AICallbackHandler.handleBankNameInput(ctx);
+        return;
+      }
+
+      // Handle AI withdrawal PIN input
+      if (aiWithdrawalState?.step === "awaiting_pin") {
+        await AICallbackHandler.handlePINInput(ctx);
+        return;
+      }
+
+      // AI-powered withdrawal detection - detect natural language withdrawal requests
+      // Examples: "send 2k to 8058509303 GT bank", "send 5 usdt to 0x000000000"
+      // Only responds to withdrawal intents, ignores other messages
+      console.log("Checking for withdrawal intent:", text);
+      await AICallbackHandler.handleAIQuery(ctx);
     });
 
     // Register callback handlers for group command
@@ -488,7 +522,7 @@ export class CommandManager {
         { command: "help", description: "Get help" },
         { command: "wallet", description: "Manage your wallet" },
         { command: "referral", description: "View referral info" },
-        { command: "image", description: "Test image features" },
+        // { command: "image", description: "Test image features" },
       ];
 
       // Define commands for group chats (group management)

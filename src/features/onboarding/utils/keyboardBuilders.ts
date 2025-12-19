@@ -15,13 +15,12 @@ export function buildPrivateChatKeyboard(): {
     ],
     [
       Markup.button.callback("Withdraw", "withdraw_sol"),
-      Markup.button.callback("Deposit", "deposit_sol"),
+      Markup.button.callback("Referral", "referral")
     ],
     [
       Markup.button.callback(" Help & Commands", "show_help"),
       Markup.button.callback(" About Jumpa", "show_about"),
     ],
-    [Markup.button.callback("Referral", "referral")],
     [Markup.button.callback("🔄 Refresh", "back_to_menu")],
   ]);
 }
