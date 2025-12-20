@@ -79,7 +79,9 @@ export async function executeETHTransfer(
     console.log(`[${chain} ETH Transfer] Current balance: ${ethBalance} ETH`);
 
     // 4. Estimate gas for the transaction
-    const amountWei = ethers.parseEther(amount.toString());
+    // Limit to 6 decimal places to prevent "too many decimals" error
+    const limitedAmount = parseFloat(amount.toFixed(6));
+    const amountWei = ethers.parseEther(limitedAmount.toString());
 
     const gasEstimate = await provider.estimateGas({
       to: toAddress,
@@ -197,7 +199,9 @@ export async function executeUSDCTransferEVM(
     }
 
     // 5. Transfer
-    const amountInSmallestUnit = ethers.parseUnits(amount.toString(), decimals);
+    // Limit to 6 decimal places to prevent "too many decimals" error
+    const limitedAmount = parseFloat(amount.toFixed(6));
+    const amountInSmallestUnit = ethers.parseUnits(limitedAmount.toString(), decimals);
 
     console.log(`[${chain} USDC Transfer] Amount in smallest unit: ${amountInSmallestUnit.toString()}`);
     console.log(`[${chain} USDC Transfer] Sending transaction...`);
@@ -289,7 +293,9 @@ export async function executeUSDTTransferEVM(
     }
 
     // 5. Transfer
-    const amountInSmallestUnit = ethers.parseUnits(amount.toString(), decimals);
+    // Limit to 6 decimal places to prevent "too many decimals" error
+    const limitedAmount = parseFloat(amount.toFixed(6));
+    const amountInSmallestUnit = ethers.parseUnits(limitedAmount.toString(), decimals);
 
     console.log(`[${chain} USDT Transfer] Amount in smallest unit: ${amountInSmallestUnit.toString()}`);
     console.log(`[${chain} USDT Transfer] Sending transaction...`);

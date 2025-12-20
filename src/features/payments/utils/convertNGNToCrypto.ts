@@ -48,7 +48,13 @@ export async function convertNGNToCrypto(
 
     console.log(`[Currency Conversion] $${usdAmount.toFixed(2)} = ${cryptoAmount.toFixed(6)} ${currency}`);
 
-    return cryptoAmount;
+    // Limit decimal places to prevent ethers.js "too many decimals" error
+    // Most tokens support up to 18 decimals, but we limit to 6 for practical amounts
+    const limitedAmount = parseFloat(cryptoAmount.toFixed(6));
+
+    console.log(`[Currency Conversion] Final amount (limited to 6 decimals): ${limitedAmount} ${currency}`);
+
+    return limitedAmount;
   } catch (error: any) {
     console.error('[Currency Conversion] Error:', error);
     throw new Error(`Failed to convert currency: ${error.message}`);
