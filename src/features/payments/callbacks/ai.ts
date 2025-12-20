@@ -30,7 +30,7 @@ export async function detectWithdrawalIntent(message: string): Promise<{
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-3-flash-preview',
       contents: `Analyze this message and determine if it's a withdrawal/send money request: "${message}"`,
       config: {
         systemInstruction: `You are a withdrawal intent detector for Jumpa, a Telegram trading bot.

@@ -293,8 +293,8 @@ ISC License
 
 ## 👥 Meet the Team
 
-Fullstack Developer - [Damian Olebuezie](https://github.com/czDamian)
-CEO - Anita Ndukwe
+- Fullstack Developer - [Damian Olebuezie](https://github.com/czDamian)
+- CEO - Anita Ndukwe
 
 **Ndukwe Anita**
 
