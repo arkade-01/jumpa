@@ -2,7 +2,11 @@
 
 Jumpa is a Telegram-based collaborative trading bot that enables users to create groups for collective cryptocurrency trading on Solana and EVM blockchains.
 
-## 🌟 Features
+### **Test the bot on Telegram 👉** [Jumpa Bot](https://t.me/official_jumpa_bot)
+### **Watch the Demo Video on YouTube 👉** [Demo Video](https://youtube.com/shorts/85Gsr1IsJAM?feature=shared)
+
+
+## Features
 
 - **Multi-Chain Support**: Trade on Solana and EVM-compatible chains
 - **Collaborative Trading**: Create groups and make collective trading decisions
@@ -12,7 +16,7 @@ Jumpa is a Telegram-based collaborative trading bot that enables users to create
 - **On-Chain State**: Anchor smart contract integration for transparent group management
 - **Social Trading**: Referral system and community-driven decision making
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Backend
 
@@ -183,7 +187,7 @@ npm run build
 npm start
 ```
 
-## 🏗️ Architecture
+## Architecture
 
 ### Path Aliases
 
@@ -218,7 +222,7 @@ In-memory state management for multi-step user flows:
 - [On-Chain Commands Guide](docs/ON_CHAIN_COMMANDS_GUIDE.md)
 - [Testing Guide](docs/TESTING_GUIDE.md)
 
-## 🚢 Deployment
+## Deployment
 
 ### Deploy to Railway
 
@@ -251,7 +255,7 @@ Set the following:
 - **Environment Variables**: Sensitive data stored in environment variables
 - **Rate Limiting**: Built-in rate limiting for bot commands
 
-## 🧪 Testing
+## Testing
 
 ```bash
 npm test
@@ -279,7 +283,7 @@ See [Testing Guide](docs/TESTING_GUIDE.md) for detailed testing instructions.
 - `/group` - View group details
 - `/poll` - Create poll for trading decision
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -291,14 +295,15 @@ See [Testing Guide](docs/TESTING_GUIDE.md) for detailed testing instructions.
 
 ISC License
 
-## 👥 Meet the Team
+## Meet the Team
 
-- Fullstack Developer - [Damian Olebuezie](https://github.com/czDamian)
-- CEO - Anita Ndukwe
+- CEO and Co-founder - **Anita Ndukwe**
+- COO and Co-founder - **Udoma Christian**
+- CTO and Fullstack Developer - [Damian Olebuezie](https://github.com/czDamian)
 
-**Ndukwe Anita**
 
-## 🐛 Issues
+
+## Issues
 
 Report issues at: https://github.com/official-jumpa/jumpa/issues
 
