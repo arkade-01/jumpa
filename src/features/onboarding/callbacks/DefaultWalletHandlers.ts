@@ -1,6 +1,8 @@
 import { Context } from "telegraf";
 import { Markup } from "telegraf";
 import { getAllTokenBalances } from "@shared/utils/getTokenBalances";
+import getUser from "@src/features/users/getUserInfo";
+import { getAmadeusBalance } from "@src/blockchain/amadeus/amadeusFunctions";
 
 export class DefaultWalletHandlers {
   // Handle set default Solana wallet callback
@@ -23,8 +25,7 @@ export class DefaultWalletHandlers {
         return;
       }
 
-      const User = (await import("@core/database/models/user")).default;
-      const user = await User.findOne({ telegram_id: telegramId });
+      const user = await getUser(telegramId, username);
 
       if (!user || !user.solanaWallets[walletIndex]) {
         await ctx.answerCbQuery("❌ Wallet not found.");
@@ -223,9 +224,7 @@ export class DefaultWalletHandlers {
         await ctx.answerCbQuery("❌ Invalid wallet index.");
         return;
       }
-
-      const User = (await import("@core/database/models/user")).default;
-      const user = await User.findOne({ telegram_id: telegramId });
+      const user = await getUser(telegramId, username);
 
       if (!user || !user.evmWallets[walletIndex]) {
         await ctx.answerCbQuery("❌ Wallet not found.");
@@ -405,6 +404,154 @@ export class DefaultWalletHandlers {
     }
   }
 
+  //handle set default AMA wallet callback
+  static async handleSetDefaultAmaWallet(ctx: Context): Promise<void> {
+    const telegramId = ctx.from?.id;
+    const username = ctx.from?.username || ctx.from?.first_name || "Unknown";
+    const cbData = (ctx.callbackQuery as any).data;
+
+    if (!telegramId) {
+      await ctx.answerCbQuery("❌ Unable to identify your account.");
+      return;
+    }
+
+    try {
+      // Format: set_default_ama:INDEX
+      const walletIndex = parseInt(cbData.split(":")[1]);
+
+      if (isNaN(walletIndex)) {
+        await ctx.answerCbQuery("❌ Invalid wallet index.");
+        return;
+      }
+
+      const user = await getUser(telegramId, username);
+
+      if (!user || !user.amadeusWallets[walletIndex]) {
+        await ctx.answerCbQuery("❌ Wallet not found.");
+        return;
+      }
+
+      // Check if already default
+      if (walletIndex === 0) {
+        await ctx.answerCbQuery("ℹ️ This is already your default wallet.");
+        return;
+      }
+
+      // Delete the old message
+      try {
+        await ctx.deleteMessage();
+      } catch (error) {
+        console.log("Could not delete message:", error);
+      }
+
+      // Move the selected wallet to index 0
+      const selectedWallet = user.amadeusWallets[walletIndex];
+      user.amadeusWallets.splice(walletIndex, 1);
+      user.amadeusWallets.unshift(selectedWallet);
+      await user.save();
+
+      await ctx.answerCbQuery("✅ Default wallet updated!");
+
+      // Refresh the view
+      const { WalletViewHandlers } = await import("./WalletViewHandlers");
+      await WalletViewHandlers.handleViewWallet(ctx);
+
+    } catch (error) {
+      console.error("Set default AMA wallet error:", error);
+      await ctx.answerCbQuery("❌ Failed to set default wallet.");
+    }
+  }
+
+  // Handle delete AMA wallet callback
+  static async handleDeleteAmaWallet(ctx: Context): Promise<void> {
+    const telegramId = ctx.from?.id;
+    const cbData = (ctx.callbackQuery as any).data;
+
+    if (!telegramId) {
+      await ctx.answerCbQuery("❌ Unable to identify your account.");
+      return;
+    }
+
+    try {
+      // Format: delete_ama_wallet:INDEX or confirm_delete_ama:INDEX
+      const [action, indexStr] = cbData.split(":");
+      const walletIndex = parseInt(indexStr);
+
+      if (isNaN(walletIndex)) {
+        await ctx.answerCbQuery("❌ Invalid wallet index.");
+        return;
+      }
+
+      const User = (await import("@core/database/models/user")).default;
+      const user = await User.findOne({ telegram_id: telegramId });
+
+      if (!user || !user.amadeusWallets[walletIndex]) {
+        await ctx.answerCbQuery("❌ Wallet not found.");
+        return;
+      }
+
+      const wallet = user.amadeusWallets[walletIndex];
+      const shortAddress = `${wallet.publicKey.slice(0, 6)}...${wallet.publicKey.slice(-4)}`;
+
+      // If this is the first click (not confirmed yet), show confirmation
+      if (action === "delete_ama_wallet") {
+        await ctx.answerCbQuery("⚠️ Confirm deletion");
+
+        // Delete the old message
+        try {
+          await ctx.deleteMessage();
+        } catch (error) {
+          console.log("Could not delete message:", error);
+        }
+
+        const confirmMessage = `⚠️ <b>Confirm Deletion</b>\n\nAre you sure you want to delete Amadeus Wallet ${walletIndex + 1}?\n\n<b>Address:</b> <code>${shortAddress}</code>\n\n<b>Warning:</b> This action cannot be undone. Make sure you have backed up your private key before proceeding.`;
+
+        const keyboard = Markup.inlineKeyboard([
+          [
+            Markup.button.callback("✅ Yes, Delete", `confirm_delete_ama:${walletIndex}`),
+            Markup.button.callback("❌ Cancel", "view_wallet"),
+          ],
+        ]);
+
+        await ctx.reply(confirmMessage, {
+          parse_mode: "HTML",
+          ...keyboard,
+        });
+        return;
+      }
+
+      // If confirmed, proceed with deletion
+      if (action === "confirm_delete_ama") {
+        // Delete the old message
+        try {
+          await ctx.deleteMessage();
+        } catch (error) {
+          console.log("Could not delete message:", error);
+        }
+
+        // Remove the wallet from the array
+        user.amadeusWallets.splice(walletIndex, 1);
+        await user.save();
+
+        await ctx.answerCbQuery("✅ Wallet deleted successfully!");
+
+        // Show confirmation message
+        await ctx.reply(
+          `🗑️ Amadeus Wallet ${walletIndex + 1} (${shortAddress}) has been deleted.`,
+          {
+            parse_mode: "HTML",
+          }
+        );
+
+        // Rebuild and display the wallet view
+        const { WalletViewHandlers } = await import("./WalletViewHandlers");
+        await WalletViewHandlers.handleViewWallet(ctx);
+      }
+    } catch (error) {
+      console.error("Delete Amadeus wallet error:", error);
+      await ctx.answerCbQuery("❌ Failed to delete wallet.");
+    }
+  }
   // Handle delete Solana wallet callback
   static async handleDeleteSolanaWallet(ctx: Context): Promise<void> {
     const telegramId = ctx.from?.id;

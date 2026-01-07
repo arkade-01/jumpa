@@ -8,6 +8,7 @@ import {
   buildGroupChatKeyboard,
   buildWalletSetupKeyboard,
 } from "./keyboardBuilders";
+import { getAmadeusBalance } from "@src/blockchain/amadeus/amadeusFunctions";
 
 /**
  * Display the main menu with user's wallet balances.
@@ -34,6 +35,13 @@ export async function displayMainMenu(
     user.solanaWallets.length > 0 &&
     user.solanaWallets[0].address;
   console.log("Has Solana Wallet:", hasSolanaWallet);
+
+  const hasAmadeusWallet =
+    user.amadeusWallets &&
+    user.amadeusWallets.length > 0 &&
+    user.amadeusWallets[0].publicKey;
+  console.log("Has Amadeus Wallet:", hasAmadeusWallet);
+
   const hasEvmWallet =
     user.evmWallets && user.evmWallets.length > 0 && user.evmWallets[0].address;
   console.log("Has EVM Wallet:", hasEvmWallet);
@@ -69,12 +77,15 @@ Choose an option below to get started:`;
   const firstName = ctx.from?.first_name || username;
 
   // Fetch balances in parallel
-  const [tokenBalances, evmBalances] = await Promise.all([
+  const [tokenBalances, evmBalances, amadeusBalances] = await Promise.all([
     hasSolanaWallet
       ? getAllTokenBalances(user.solanaWallets[0].address)
       : Promise.resolve(null),
     hasEvmWallet
       ? getAllEvmBalances(user.evmWallets[0].address)
+      : Promise.resolve(null),
+    hasAmadeusWallet
+      ? getAmadeusBalance(user.amadeusWallets[0].publicKey)
       : Promise.resolve(null)
   ]);
 
@@ -94,6 +105,17 @@ SOL: ${user.solanaWallets[0].balance.toFixed(
     )}   • USDC: ${tokenBalances.usdc.toFixed(
       1
     )}   • USDT: ${tokenBalances.usdt.toFixed(1)}
+`;
+  }
+
+  // Add Amadeus wallet section only if user has one
+  if (hasAmadeusWallet && amadeusBalances) {
+    welcomeMessage += `
+*--- Your Amadeus Wallet ---*
+
+\`${user.amadeusWallets[0].publicKey}\`
+
+AMA: ${amadeusBalances}
 `;
   }
 

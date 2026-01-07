@@ -140,12 +140,28 @@ export class CommandManager {
       StartCallbackHandlers.handleDeleteEVMWallet
     );
     this.bot.action(
+      "add_wallet_amadeus",
+      StartCallbackHandlers.handleAddAmadeusWallet
+    );
+    this.bot.action(
       /confirm_delete_solana:/,
       StartCallbackHandlers.handleDeleteSolanaWallet
     );
     this.bot.action(
       /confirm_delete_evm:/,
       StartCallbackHandlers.handleDeleteEVMWallet
+    );
+    this.bot.action(
+      /set_default_ama:/,
+      StartCallbackHandlers.handleSetDefaultAmaWallet
+    );
+    this.bot.action(
+      /delete_ama_wallet:/,
+      StartCallbackHandlers.handleDeleteAmaWallet
+    );
+    this.bot.action(
+      /confirm_delete_ama:/,
+      StartCallbackHandlers.handleDeleteAmaWallet
     );
 
     // Register deposit callback handlers
@@ -354,6 +370,18 @@ export class CommandManager {
           return;
         }
         await StartCallbackHandlers.handleAddEVMPrivateKeyInput(ctx, text);
+        return;
+      }
+
+      // Handle add Amadeus private key input
+      if (userAction?.action === "awaiting_add_amadeus_private_key") {
+        // Check if user wants to cancel
+        if (text.toLowerCase().trim() === "/cancel") {
+          clearUserActionState(userId);
+          await ctx.reply("❌ Add wallet cancelled.");
+          return;
+        }
+        await StartCallbackHandlers.handleAddAmadeusPrivateKeyInput(ctx, text);
         return;
       }
 

@@ -4,6 +4,7 @@ import { Markup } from "telegraf";
 import { getAllTokenBalances } from "@shared/utils/getTokenBalances";
 import { getAllEvmBalances } from "@shared/utils/getEvmBalances";
 import { sendOrEdit } from "@shared/utils/messageHelper";
+import { getAmadeusBalance } from "@src/blockchain/amadeus/amadeusFunctions";
 
 export class WalletViewHandlers {
   // Handle view wallet callback
@@ -96,6 +97,22 @@ Set up a wallet to start trading!`;
         walletMessage += `\n`;
       }
 
+      // Display Amadeus wallets
+      const amadeusWallets = user.amadeusWallets || [];
+      if (amadeusWallets.length > 0) {
+        walletMessage += `<b>⚫ Amadeus Wallets (${amadeusWallets.length}/3)</b>\n`;
+
+        for (let index = 0; index < amadeusWallets.length; index++) {
+          const wallet = amadeusWallets[index];
+          const balance = await getAmadeusBalance(wallet.publicKey);
+
+          const defaultBadge = index === 0 ? " 🟢 <b>(Default)</b>\n" : "";
+          walletMessage += `\n<code>${wallet.publicKey}</code>${defaultBadge}\n`;
+          walletMessage += `   Balance: ${balance} AMA\n`;
+        }
+        walletMessage += `\n`;
+      }
+
       // Build keyboard with set default buttons
       const keyboardButtons = [
         [
@@ -152,6 +169,34 @@ Set up a wallet to start trading!`;
         for (let i = 0; i < evmWallets.length; i++) {
           deleteButtons.push(
             Markup.button.callback(`🗑️ Delete EVM ${i + 1}`, `delete_evm_wallet:${i}`)
+          );
+        }
+        // Add buttons in rows of 2
+        for (let i = 0; i < deleteButtons.length; i += 2) {
+          keyboardButtons.push(deleteButtons.slice(i, i + 2));
+        }
+      }
+
+      // Add "Set as Default" buttons for Amadeus wallets
+      if (amadeusWallets.length > 1) {
+        const amaButtons = [];
+        for (let i = 1; i < amadeusWallets.length; i++) {
+          amaButtons.push(
+            Markup.button.callback(`Set AMA ${i + 1} as Main`, `set_default_ama:${i}`)
+          );
+        }
+        // Add buttons in rows of 2
+        for (let i = 0; i < amaButtons.length; i += 2) {
+          keyboardButtons.push(amaButtons.slice(i, i + 2));
+        }
+      }
+
+      // Add delete buttons for Amadeus wallets
+      if (amadeusWallets.length > 0) {
+        const deleteButtons = [];
+        for (let i = 0; i < amadeusWallets.length; i++) {
+          deleteButtons.push(
+            Markup.button.callback(`🗑️ Delete AMA ${i + 1}`, `delete_ama_wallet:${i}`)
           );
         }
         // Add buttons in rows of 2

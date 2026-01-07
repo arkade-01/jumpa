@@ -92,6 +92,19 @@ export class StartCallbackHandlers {
     return AddWalletHandlers.handleAddSolanaPrivateKeyInput(ctx, privateKeyInput);
   }
 
+  // Handle add Amadeus wallet callback
+  static async handleAddAmadeusWallet(ctx: Context): Promise<void> {
+    return AddWalletHandlers.handleAddAmadeusWallet(ctx);
+  }
+
+  // Handle add Amadeus private key input
+  static async handleAddAmadeusPrivateKeyInput(
+    ctx: Context,
+    privateKeyInput: string
+  ): Promise<void> {
+    return AddWalletHandlers.handleAddAmadeusPrivateKeyInput(ctx, privateKeyInput);
+  }
+
   // Handle set default Solana wallet callback
   static async handleSetDefaultSolanaWallet(ctx: Context): Promise<void> {
     return DefaultWalletHandlers.handleSetDefaultSolanaWallet(ctx);
@@ -110,6 +123,16 @@ export class StartCallbackHandlers {
   // Handle delete EVM wallet callback
   static async handleDeleteEVMWallet(ctx: Context): Promise<void> {
     return DefaultWalletHandlers.handleDeleteEVMWallet(ctx);
+  }
+
+  // Handle set default Amadeus wallet callback
+  static async handleSetDefaultAmaWallet(ctx: Context): Promise<void> {
+    return DefaultWalletHandlers.handleSetDefaultAmaWallet(ctx);
+  }
+
+  // Handle delete Amadeus wallet callback
+  static async handleDeleteAmaWallet(ctx: Context): Promise<void> {
+    return DefaultWalletHandlers.handleDeleteAmaWallet(ctx);
   }
 
   // Handle back to main menu callback

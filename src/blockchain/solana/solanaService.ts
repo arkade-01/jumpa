@@ -7,7 +7,8 @@ import {
   TransactionInstruction,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { AnchorProvider, Program, BN, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
+import BN from "bn.js";
 import { getSolanaConnection } from "@shared/utils/rpcConfig";
 import { decryptPrivateKey } from "@shared/utils/encryption";
 import idlJson from "./idl.json";

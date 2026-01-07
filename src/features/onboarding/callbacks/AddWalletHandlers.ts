@@ -2,7 +2,9 @@ import { Context } from "telegraf";
 import getUser, {
   addSolanaWalletToUser,
   addEVMWalletToUser,
+  addAmadeusWalletToUser,
 } from "@features/users/getUserInfo";
+import { validateAmadeusPrivateKey } from "@src/blockchain/amadeus/amadeusFunctions";
 import { Markup } from "telegraf";
 import { encryptPrivateKey } from "@shared/utils/encryption";
 import { Keypair } from "@solana/web3.js";
@@ -35,6 +37,8 @@ Choose the wallet type you want to add. Choose EVM if you want to import a walle
         [
           Markup.button.callback("🟣 Import Solana", "add_wallet_solana"),
           Markup.button.callback("🔵 Import EVM", "add_wallet_evm"),
+        ], [
+          Markup.button.callback("⚫️ Import Amadeus", "add_wallet_amadeus"),
         ],
         [
           Markup.button.callback(
@@ -45,7 +49,7 @@ Choose the wallet type you want to add. Choose EVM if you want to import a walle
         [Markup.button.callback("🔙 Back", "view_wallet")],
       ]);
 
-      await ctx.reply(message, {
+      await sendOrEdit(ctx, message, {
         parse_mode: "Markdown",
         ...keyboard,
       });
@@ -492,7 +496,157 @@ Your wallet has been added to your account!`;
       );
     }
   }
+
+  // Handle add Amadeus wallet callback
+  static async handleAddAmadeusWallet(ctx: Context): Promise<void> {
+    try {
+      const telegramId = ctx.from?.id;
+
+      if (!telegramId) {
+        await ctx.answerCbQuery("❌ Unable to identify your account.");
+        return;
+      }
+
+      await ctx.answerCbQuery("⚫️ Add Amadeus Wallet");
+
+      // Get user to check if wallet already exists
+      const user = await getUser(
+        telegramId,
+        ctx.from?.username || ctx.from?.first_name || "Unknown"
+      );
+      if (!user) {
+        await ctx.reply(
+          "❌ User not found. Please use /start to register first."
+        );
+        return;
+      }
+
+      // Check wallet limit
+      if (user.amadeusWallets.length >= 3) {
+        await ctx.reply(
+          "❌ You have reached the maximum limit of 3 Amadeus wallets."
+        );
+        return;
+      }
+
+      // Set state to await private key
+      setUserActionState(telegramId, {
+        action: "awaiting_add_amadeus_private_key",
+      });
+
+      const importMessage = `📥 **Add Amadeus Wallet**
+
+Paste your Amadeus private key (starting with 'seed...').
+
+⚠️ **Note:**
+- Your private key will be stored securely.
+- Never share your private key with anyone
+- This wallet will be added to your existing wallets
+`;
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🏠 Go Back", "back_to_menu")],
+      ]);
+      await sendOrEdit(ctx, importMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
+    } catch (error) {
+      console.error("Add Amadeus wallet error:", error);
+      await ctx.answerCbQuery("❌ Failed to start add wallet process.");
+      await ctx.reply("❌ An error occurred. Please try again.");
+    }
+  }
+
+  // Handle add Amadeus private key input
+  static async handleAddAmadeusPrivateKeyInput(
+    ctx: Context,
+    privateKeyInput: string
+  ): Promise<void> {
+    const telegramId = ctx.from?.id;
+    if (!telegramId) {
+      await ctx.reply("❌ Unable to identify your account.");
+      return;
+    }
+
+    try {
+      // Clear the state
+      clearUserActionState(telegramId);
+
+      // Clean the input (remove whitespace)
+      const privateKeyInputClean = privateKeyInput.trim();
+
+      // Validate private key
+      const validation = validateAmadeusPrivateKey(privateKeyInputClean);
+      if (!validation.success || !validation.pubKey) {
+        await ctx.reply(
+          "❌ Invalid Amadeus private key. Please check and try again."
+        );
+        return;
+      }
+
+      const publicKey = validation.pubKey;
+
+      // Check if wallet already exists in user's wallets
+      const user = await getUser(
+        telegramId,
+        ctx.from?.username || ctx.from?.first_name || "Unknown"
+      );
+      if (!user) {
+        await ctx.reply("❌ User not found.");
+        return;
+      }
+
+      const existingWallet = user.amadeusWallets.find(
+        (wallet) => wallet.publicKey === publicKey
+      );
+      if (existingWallet) {
+        await ctx.reply("⚠️ This wallet is already added to your account.");
+        return;
+      }
+
+      // Encrypt private key
+      const encryptedPrivateKey = encryptPrivateKey(privateKeyInputClean);
+
+      // Add wallet to user
+      await addAmadeusWalletToUser(
+        telegramId,
+        publicKey,
+        encryptedPrivateKey
+      );
+
+      const successMessage = `✅ **Amadeus Wallet Added Successfully!**
+
+ **Wallet Address:**
+\`${publicKey}\`
+
+`;
+
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Wallets", "view_wallet")],
+      ]);
+
+      await sendOrEdit(ctx, successMessage, {
+        parse_mode: "Markdown",
+        ...keyboard,
+      });
+    } catch (error) {
+      console.error("Add Amadeus private key error:", error);
+      clearUserActionState(telegramId);
+
+      // Handle specific error cases
+      if (error instanceof Error && error.message === "Wallet already exists") {
+        await ctx.reply("⚠️ This wallet is already added to your account.");
+      } else if (error instanceof Error && error.message.includes("Invalid base58Seed")) {
+        await ctx.reply("❌ Invalid Amadeus private key. Please check and try again.");
+      } else {
+        await ctx.reply(
+          "❌ An error occurred while adding your wallet. Please try again."
+        );
+      }
+    }
+  }
 }
+
 //function to generate the wallet
 const createRandomEvmWallet = () => {
   try {

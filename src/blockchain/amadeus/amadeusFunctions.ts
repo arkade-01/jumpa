@@ -1,0 +1,56 @@
+
+import { AmadeusSDK, generateKeypair, derivePublicKeyFromSeedBase58, fromAtomicAma } from '@amadeus-protocol/sdk'
+
+// Initialize SDK (uses default node URL if not specified)
+const sdk = new AmadeusSDK({
+  baseUrl: 'https://nodes.amadeus.bot/api'
+})
+
+/**
+ * Generates a new Amadeus wallet
+ */
+export async function generateAmadeusWallet() {
+  const wallet = generateKeypair();
+  console.log("keypair generated", wallet)
+
+  const pubKey = wallet.publicKey;
+  console.log("public key", pubKey)
+
+  const privKey = wallet.privateKey;
+  console.log("private key", privKey)
+
+  const bal = await sdk.wallet.getBalance(pubKey);
+  const balance = fromAtomicAma(bal.balance.flat).toFixed(4);
+  console.log("wallet balance", balance)
+
+  return {
+    pubKey,
+    privKey,
+    balance
+  }
+
+}
+
+/**
+ * Gets the balance of an Amadeus wallet, default token is AMA
+ */
+export async function getAmadeusBalance(pubKey: string, token?: string) {
+  const bal = await sdk.wallet.getBalance(pubKey, token);
+  const balance = fromAtomicAma(bal.balance.flat).toFixed(4);
+  console.log("wallet balance", balance)
+
+
+  return balance
+}
+
+/**
+ * Validates an Amadeus private key
+ */
+export function validateAmadeusPrivateKey(privKey: string) {
+  const pubKey = derivePublicKeyFromSeedBase58(privKey);
+  console.log("derived key", pubKey)
+  if (pubKey) {
+    return { success: true, pubKey };
+  }
+  return { success: false, pubKey: "" };
+}

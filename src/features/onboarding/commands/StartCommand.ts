@@ -21,7 +21,6 @@ export class StartCommand extends BaseCommand {
         );
         return;
       }
-
       // Parse referral code from start parameter (e.g., /start ref_ABC123)
       // Extract the parameter from the message text
       let referrerTelegramId: number | null = null;
