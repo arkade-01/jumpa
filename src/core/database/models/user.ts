@@ -62,9 +62,23 @@ const userSchema = new mongoose.Schema(
           type: Number,
           default: 0,
         },
+        celo: {
+          eth: { type: Number, default: 0 },
+          usdc: { type: Number, default: 0 },
+          usdt: { type: Number, default: 0 },
+        },
+        base: {
+          eth: { type: Number, default: 0 },
+          usdc: { type: Number, default: 0 },
+          usdt: { type: Number, default: 0 },
+        },
         last_updated_balance: {
           type: Date,
           default: Date.now,
+        },
+        last_updated_evm_balance: {
+          type: Date,
+          default: () => new Date(0), // Set to epoch start to force initial fetch
         },
       },
     ],
@@ -107,7 +121,7 @@ const userSchema = new mongoose.Schema(
         type: String,
         default: "",
       },
-      bank_code: {
+      bank_code: { //yara bank code
         type: String,
         default: "",
       },
@@ -116,26 +130,10 @@ const userSchema = new mongoose.Schema(
         default: 0,
       },
     },
-    is_active: {
-      type: Boolean,
-      default: true,
-    },
     role: {
       type: String,
       enum: ["user", "admin"],
       default: "user",
-    },
-    created_at: {
-      type: Date,
-      default: Date.now,
-    },
-    updated_at: {
-      type: Date,
-      default: Date.now,
-    },
-    last_seen: {
-      type: Date,
-      default: Date.now,
     },
   },
   {

@@ -17,5 +17,7 @@ export const config = {
   alchemyMainnetRpc: process.env.ALCHEMY_MAINNET_RPC || "",
   geminiApiKey: process.env.GEMINI_API_KEY || "",
   paystackBearerKey: process.env.PAYSTACK_BEARER_KEY || "",
+  switchApiKey: process.env.SWITCH_LIVE_KEY || "",
+  switchSandboxKey: process.env.SWITCH_SANDBOX_KEY || "",
 
 };

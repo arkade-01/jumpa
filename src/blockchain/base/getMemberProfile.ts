@@ -10,7 +10,7 @@ const provider = new ethers.JsonRpcProvider(config.evmRpcUrl);
  * Returns contribution amount, join time, and approval status
  */
 
-export const getMemberProfile = async (address: string, memberAddress: string) => {
+export const getBaseMemberProfile = async (address: string, memberAddress: string) => {
   const contract = new Contract(address, jumpaGroupAbi.abi, provider);
 
   try {

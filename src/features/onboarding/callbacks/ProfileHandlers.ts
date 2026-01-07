@@ -40,7 +40,13 @@ export class ProfileHandlers {
       <b>📊 Your Profile</b>
 
 <b>Username:</b> @${username}
-<b>Member Since:</b> ${user.created_at?.toLocaleString() || "Unknown"}
+
+<b>Joined on:</b> ${user.createdAt ? (() => {
+          const date = new Date(user.createdAt);
+          const day = date.getDate();
+          const suffix = ["th", "st", "nd", "rd"][((day % 100) - 20) % 10] || ["th", "st", "nd", "rd"][day % 10] || "th";
+          return `${day}${suffix} ${date.toLocaleString('default', { month: 'short' })} ${date.getFullYear()}`;
+        })() : "Unknown"}
 
 <b>Groups:</b> ${userGroups.length}
       `;

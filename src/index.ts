@@ -23,7 +23,9 @@ const commandManager = new CommandManager(bot);
 // Error handling
 bot.catch((err: any, ctx: Context) => {
   console.error("Bot error:", err);
-  ctx.reply("Sorry, something went wrong! Please try again later.");
+  //gracefully ignore bot errors
+  // ctx.reply("Sorry, something went wrong! Please try again later.");
+
 });
 
 // Graceful shutdown

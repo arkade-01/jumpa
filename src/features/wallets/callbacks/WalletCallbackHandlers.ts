@@ -4,6 +4,8 @@ import { config } from "@core/config/environment";
 import Withdrawal from "@core/database/models/withdrawal";
 import { executeSolTransfer, executeUSDCTransfer, executeUSDTTransfer } from "@features/payments/utils/solWithdrawTx";
 import { executeETHTransfer, executeUSDCTransferEVM, executeUSDTTransferEVM } from "@features/payments/utils/evmWithdrawTx";
+import { ethers } from 'ethers';
+import { PublicKey } from '@solana/web3.js';
 import { safeDeleteMessage } from "@shared/utils/messageUtils";
 import { clearWithdrawalState, getWithdrawalState, setWithdrawalState } from "@shared/state/withdrawalState";
 import { WalletViewHandlers } from "@features/onboarding/callbacks/WalletViewHandlers";
@@ -15,15 +17,20 @@ export class WalletCallbackHandlers {
 
     static async handleWithdraw(ctx: Context): Promise<void> {
         const keyboard = Markup.inlineKeyboard(
-            [[
-                Markup.button.callback("🏧To NGN Bank Account", "withdraw_to_bank"),
-                Markup.button.callback("Set Withdrawal Pin", "set_withdrawal_pin"),
-            ], [
-                Markup.button.callback("🔙 Back", "back_to_menu"),
-            ],]
+            [
+                [
+                    Markup.button.callback("🏧To NGN Bank Account", "withdraw_to_bank"),
+                    Markup.button.callback("On Chain", "withdraw_onchain"),
+                ], [
+                    Markup.button.callback("Set Withdrawal Pin", "set_withdrawal_pin"),
+                ],
+                [
+                    Markup.button.callback("🔙 Back", "back_to_menu"),
+                ],
+            ]
         );
 
-        await sendOrEdit(ctx, "Where would you like to withdraw to? Make sure you have setup your withdrawal pin before proceeding", keyboard);
+        await sendOrEdit(ctx, "Where would you like to withdraw to? You can withdraw to your NGN bank account or to an account on chain. Make sure you have setup your withdrawal pin before proceeding", keyboard);
     }
 
     static async handleWithdrawToBank(ctx: Context): Promise<void> {
@@ -626,27 +633,239 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
     }
 
 
+
+    static async handleWithdrawOnChain(ctx: Context): Promise<void> {
+        const telegramId = ctx.from?.id;
+        const username = ctx.from?.username || ctx.from?.first_name || "Unknown";
+
+        if (!telegramId) return;
+
+        const balances = await getUserBalances(telegramId, username);
+        const balancesMessage = formatBalances(balances);
+
+        const message = `${balancesMessage}\n\n<b>Select asset to withdraw:</b>`;
+
+        const keyboard = Markup.inlineKeyboard([
+            [
+                Markup.button.callback("SOL (Solana)", "withdraw_onchain_asset:SOL:SOLANA"),
+                Markup.button.callback("USDC (Solana)", "withdraw_onchain_asset:USDC:SOLANA"),
+                Markup.button.callback("USDT (Solana)", "withdraw_onchain_asset:USDT:SOLANA"),
+            ],
+            [
+                Markup.button.callback("ETH (Base)", "withdraw_onchain_asset:ETH:BASE"),
+                Markup.button.callback("USDC (Base)", "withdraw_onchain_asset:USDC:BASE"),
+                Markup.button.callback("USDT (Base)", "withdraw_onchain_asset:USDT:BASE"),
+            ],
+            [
+                Markup.button.callback("USDC (Celo)", "withdraw_onchain_asset:USDC:CELO"),
+                Markup.button.callback("USDT (Celo)", "withdraw_onchain_asset:USDT:CELO"),
+            ],
+            [Markup.button.callback("❌ Cancel", "delete_message")]
+        ]);
+
+        await sendOrEdit(ctx, message, { parse_mode: "HTML", ...keyboard });
+    }
+
+
+    static async handleWithdrawOnChainAsset(ctx: Context): Promise<void> {
+        const cbData = (ctx.callbackQuery as any).data;
+        const parts = cbData.split(":");
+        const asset = parts[1];
+        const chain = parts[2];
+        const telegramId = ctx.from?.id;
+
+        if (!telegramId) return;
+
+        setWithdrawalState(telegramId, 'awaiting_dest_address', {
+            currency: asset as any,
+            chain: chain as any
+        });
+
+        await ctx.answerCbQuery();
+        await sendOrEdit(ctx, `Please enter the receiver's <b>${chain}</b> address for <b>${asset}</b>:`, { parse_mode: "HTML" });
+    }
+
+    static async handleWithdrawAddressInput(ctx: Context): Promise<void> {
+        const telegramId = ctx.from?.id;
+        const text = (ctx.message as any)?.text;
+
+        if (!telegramId || !text) return;
+
+        const state = getWithdrawalState(telegramId);
+        if (!state || state.step !== 'awaiting_dest_address') return;
+
+        const { chain, currency } = state.data;
+        const address = text.trim();
+        let isValid = false;
+
+        // Validate address based on chain
+        if (chain === 'SOLANA') {
+            try {
+                new PublicKey(address);
+                isValid = true;
+            } catch (e) { isValid = false; }
+        } else {
+            isValid = ethers.isAddress(address);
+        }
+
+        if (!isValid) {
+            await ctx.reply(`❌ Invalid ${chain} address. Please check and try again.`);
+            return;
+        }
+
+        setWithdrawalState(telegramId, 'awaiting_onchain_amount', {
+            ...state.data,
+            destination_address: address
+        });
+
+        // Quick buttons for amount
+        const keyboard = Markup.inlineKeyboard([
+            [
+                Markup.button.callback("5", "withdraw_onchain_amount:5"),
+                Markup.button.callback("10", "withdraw_onchain_amount:10"),
+                Markup.button.callback("20", "withdraw_onchain_amount:20"),
+            ],
+            [Markup.button.callback("Custom Amount", "withdraw_onchain_amount:CUSTOM")]
+        ]);
+
+        await ctx.reply(`How much would you like to send to <code>${address}</code>?`, {
+            parse_mode: "HTML",
+            ...keyboard
+        });
+    }
+
+    static async handleWithdrawOnChainAmountSelection(ctx: Context): Promise<void> {
+        const cbData = (ctx.callbackQuery as any).data;
+        const selection = cbData.split(":")[1];
+        const telegramId = ctx.from?.id;
+
+        if (!telegramId) return;
+
+        if (selection === 'CUSTOM') {
+            await ctx.answerCbQuery();
+            await sendOrEdit(ctx, "Please enter the amount you wish to withdraw:");
+            return;
+        }
+
+        const state = getWithdrawalState(telegramId);
+        if (!state) return;
+
+        let amount = selection;
+
+        if (selection !== 'CUSTOM') {
+            await WalletCallbackHandlers.processOnChainAmount(ctx, telegramId, parseFloat(amount));
+        }
+    }
+
+    static async handleWithdrawOnChainAmountInput(ctx: Context): Promise<void> {
+        const telegramId = ctx.from?.id;
+        const text = (ctx.message as any)?.text;
+
+        if (!telegramId || !text) return;
+
+        const state = getWithdrawalState(telegramId);
+        if (!state || state.step !== 'awaiting_onchain_amount') return;
+
+        const amount = parseFloat(text);
+        if (isNaN(amount) || amount <= 0) {
+            await ctx.reply("❌ Invalid amount. Please enter a number.");
+            return;
+        }
+
+        await WalletCallbackHandlers.processOnChainAmount(ctx, telegramId, amount);
+    }
+
+    private static async processOnChainAmount(ctx: Context, telegramId: number, amount: number) {
+        const state = getWithdrawalState(telegramId);
+        if (!state) return;
+
+        const { currency, chain, destination_address } = state.data;
+
+        setWithdrawalState(telegramId, 'awaiting_onchain_pin', {
+            ...state.data,
+            amount: amount.toString()
+        });
+
+        const message = `📝 <b>Confirm Withdrawal</b>\n\n` +
+            `Asset: ${currency} (${chain})\n` +
+            `Amount: ${amount}\n` +
+            `Receiver's Address: <code>${destination_address}</code>\n\n` +
+            `Please enter your <b>4-digit withdrawal PIN</b> to confirm.`;
+
+        if (ctx.callbackQuery) {
+            await sendOrEdit(ctx, message, { parse_mode: "HTML" });
+        } else {
+            await ctx.reply(message, { parse_mode: "HTML" });
+        }
+    }
+
+    static async handleWithdrawOnChainPinVerification(ctx: Context): Promise<void> {
+        const telegramId = ctx.from?.id;
+        const text = (ctx.message as any)?.text;
+
+        if (!telegramId || !text) return;
+
+        const state = getWithdrawalState(telegramId);
+        if (!state || state.step !== 'awaiting_onchain_pin') return;
+
+        const pin = parseInt(text.trim());
+        if (isNaN(pin) || text.trim().length !== 4) {
+            await ctx.reply("❌ Invalid PIN format.");
+            return;
+        }
+
+        await safeDeleteMessage(ctx, ctx.message.message_id); // Delete PIN msg
+
+        const user = await getUser(telegramId, ctx.from?.first_name || "");
+        if (!user || user.bank_details.withdrawalPin !== pin) {
+            await ctx.reply("❌ Incorrect PIN.");
+            return;
+        }
+
+        // Execute Transaction
+        const { amount, currency, chain, destination_address } = state.data;
+        const amountNum = parseFloat(amount!);
+
+        await sendOrEdit(ctx, "🔄 Processing on-chain withdrawal...");
+
+        try {
+            let result;
+            if (chain === 'SOLANA') {
+                if (currency === 'SOL') result = await executeSolTransfer(user, destination_address!, amountNum);
+                else if (currency === 'USDC') result = await executeUSDCTransfer(user, destination_address!, amountNum);
+                else if (currency === 'USDT') result = await executeUSDTTransfer(user, destination_address!, amountNum);
+            } else {
+                if (currency === 'ETH') result = await executeETHTransfer(user, destination_address!, amountNum, chain as 'BASE' | 'CELO');
+                else if (currency === 'USDC') result = await executeUSDCTransferEVM(user, destination_address!, amountNum, chain as 'BASE' | 'CELO');
+                else if (currency === 'USDT') result = await executeUSDTTransferEVM(user, destination_address!, amountNum, chain as 'BASE' | 'CELO');
+            }
+
+            if (result && result.success) {
+                await sendOrEdit(ctx, `✅ Withdrawal Successful!\n\nView in Explorer: ${result.explorerUrl}`, { parse_mode: "HTML" });
+                clearWithdrawalState(telegramId);
+            } else {
+                await sendOrEdit(ctx, "❌ Withdrawal Failed.");
+            }
+        } catch (error: any) {
+            console.error(error);
+            await sendOrEdit(ctx, `❌ ${error.message}`);
+        }
+    }
+
     static async handleRefreshBalance(ctx: Context): Promise<void> {
         const telegramId = ctx.from?.id;
         const username = ctx.from?.username || ctx.from?.first_name || "Unknown";
 
         if (!telegramId) {
-            await ctx.answerCbQuery("❌ Unable to identify your account.");
+            await sendOrEdit(ctx, "❌ Unable to identify your account.");
             return;
         }
 
-        await ctx.answerCbQuery("🔄 Refreshing balances...");
-
-        try {
-            // Delete the old message
-            await ctx.deleteMessage();
-        } catch (error) {
-            console.log("Could not delete message:", error);
-        }
+        await ctx.answerCbQuery("🔄 fetching latest balances...");
 
         const user = await getUser(telegramId, username);
         if (!user) {
-            await ctx.reply("❌ User not found.");
+            await sendOrEdit(ctx, "❌ User not found.");
             return;
         }
 
@@ -654,22 +873,29 @@ You will get ₦${amtToReceive} once your withdrawal is confirmed.`;
             // Import necessary utilities
             const getBalance = (await import("@shared/utils/getBalance")).default;
             const { getAllTokenBalances } = await import("@shared/utils/getTokenBalances");
+            const { getAllEvmBalances } = await import("@shared/utils/getEvmBalances");
 
-            // Refresh all Solana wallet balances (respects cache if not expired)
-            for (let i = 0; i < user.solanaWallets.length; i++) {
-                const wallet = user.solanaWallets[i];
+            const promises = [];
 
-                try {
-                    // Fetch SOL balance (respects cache if not expired)
-                    await getBalance(wallet.address);
-
-                    // Fetch token balances (respects cache if not expired)
-                    await getAllTokenBalances(wallet.address);
-                } catch (walletError) {
-                    console.error(`Error refreshing wallet ${i}:`, walletError);
-                    // Continue with cached values for this wallet
+            // 1. Refresh Solana Wallets
+            if (user.solanaWallets) {
+                for (const wallet of user.solanaWallets) {
+                    // Fetch native SOL
+                    promises.push(getBalance(wallet.address, true));
+                    // Fetch SPL tokens
+                    promises.push(getAllTokenBalances(wallet.address, true));
                 }
             }
+
+            // 2. Refresh EVM Wallets
+            if (user.evmWallets) {
+                for (const wallet of user.evmWallets) {
+                    promises.push(getAllEvmBalances(wallet.address, true));
+                }
+            }
+
+            // Execute all refreshes in parallel
+            await Promise.all(promises);
 
             // After refreshing, delegate to WalletViewHandlers to display the wallet view
             await WalletViewHandlers.handleViewWallet(ctx);

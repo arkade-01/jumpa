@@ -138,6 +138,91 @@ export async function executeETHTransfer(
 }
 
 /**
+ * Execute native CELO transfer on Celo chain
+ * @param user - User object from database
+ * @param toAddress - Recipient address
+ * @param amount - Amount in CELO
+ * @returns Transaction result
+ */
+export async function executeCELOTransfer(
+  user: any,
+  toAddress: string,
+  amount: number
+) {
+  console.log(`[CELO Transfer] Starting transaction...`);
+  console.log(`[CELO Transfer] To: ${toAddress}, Amount: ${amount} CELO`);
+
+  if (!user.evmWallets || user.evmWallets.length === 0 || !user.evmWallets[0]) {
+    throw new Error('No EVM wallet found');
+  }
+
+  if (!user.evmWallets[0].encryptedPrivateKey) {
+    throw new Error('Wallet private key not found');
+  }
+
+  const privKey = decryptPrivateKey(user.evmWallets[0].encryptedPrivateKey);
+
+  try {
+    const provider = new ethers.JsonRpcProvider(CHAIN_RPC_URLS.CELO);
+    const wallet = new ethers.Wallet(privKey, provider);
+
+    console.log(`[CELO Transfer] From wallet: ${wallet.address}`);
+
+    if (!ethers.isAddress(toAddress)) {
+      throw new Error('Invalid recipient address');
+    }
+
+    const balance = await provider.getBalance(wallet.address);
+    const celoBalance = ethers.formatEther(balance);
+    console.log(`[CELO Transfer] Current balance: ${celoBalance} CELO`);
+
+    const limitedAmount = parseFloat(amount.toFixed(6));
+    const amountWei = ethers.parseEther(limitedAmount.toString());
+
+    const gasEstimate = await provider.estimateGas({
+      to: toAddress,
+      value: amountWei,
+    });
+
+    const feeData = await provider.getFeeData();
+    const gasPrice = feeData.gasPrice || ethers.parseUnits('5', 'gwei');
+    const estimatedGasCost = gasEstimate * gasPrice;
+
+    const totalNeeded = amountWei + estimatedGasCost;
+    if (balance < totalNeeded) {
+      const totalNeededCelo = ethers.formatEther(totalNeeded);
+      throw new Error(
+        `Insufficient balance. You have: ${celoBalance} CELO, You need: ${totalNeededCelo} CELO (including gas)`
+      );
+    }
+
+    console.log(`[CELO Transfer] Sending transaction...`);
+    const tx = await wallet.sendTransaction({
+      to: toAddress,
+      value: amountWei,
+    });
+
+    console.log(`[CELO Transfer] Transaction sent: ${tx.hash}`);
+    const receipt = await tx.wait();
+
+    console.log(`[CELO Transfer] ✅ Transfer successful!`);
+
+    return {
+      success: true,
+      signature: receipt.hash,
+      fromAddress: wallet.address,
+      toAddress,
+      amount,
+      explorerUrl: `${CHAIN_EXPLORERS.CELO}/tx/${receipt.hash}`
+    };
+
+  } catch (error: any) {
+    console.error(`[CELO Transfer] ❌ Transfer failed:`, error);
+    throw error;
+  }
+}
+
+/**
  * Execute USDC transfer on EVM chain (pure function)
  * @param user - User object from database
  * @param toAddress - Recipient address

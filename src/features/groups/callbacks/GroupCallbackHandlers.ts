@@ -7,8 +7,7 @@ import {
 } from "@features/wallets/balanceService";
 import getUser from "@features/users/getUserInfo";
 import { sendOrEdit } from "@shared/utils/messageHelper";
-
-
+import { BlockchainServiceFactory } from "@blockchain/shared/BlockchainServiceFactory";
 
 export class GroupCallbackHandlers {
   // Handle create callback
@@ -34,9 +33,7 @@ export class GroupCallbackHandlers {
       }
 
       const createGroupMessage = `
-**Create Group**
-
-**Why Group Trading?**
+<b>Create Group</b>
 
 With group trading, you and your members can:
 • Pool funds together for collective trading
@@ -44,25 +41,23 @@ With group trading, you and your members can:
 • Share profits based on contributions
 • Build wealth as a community
 
+Use the command below to create a new group. Each telegram group is limited to one trading group at a time.
+
+<code>/create_group (name) (blockchain) (visibility)</code>
+eg: <code>/create_group MyFirstGroup base true</code>
+
       `;
 
       // Create inline keyboard with create options
       const keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback("🏠 Create New Group", "create_group_form")],
-        [
-          Markup.button.callback(
-            "🤖 Add Bot to Telegram Group",
-            "add_bot_to_group"
-          ),
-        ],
         [
           Markup.button.callback("❓ Learn More", "group_help"),
-          Markup.button.callback(" Back", "back_to_menu"),
+          Markup.button.callback(" Back", "back_to_group_menu"),
         ],
       ]);
 
       await sendOrEdit(ctx, createGroupMessage, {
-        parse_mode: "Markdown",
+        parse_mode: "HTML",
         ...keyboard,
       });
     } catch (error) {
@@ -100,9 +95,8 @@ With group trading, you and your members can:
 
 **How to Join a group:**
 1. Get a group ID from a group admin
-2. Use the command: \`/join <group_id>\`
-3. Send your contribution to the group
-4. Start voting on trading decisions!
+2. Use the command: \`/join <group_id>\` to join the group. Public groups does not require approval before you can join.
+
 
 **Your Current Groups:**
 `;
@@ -117,12 +111,12 @@ With group trading, you and your members can:
 
       // Create inline keyboard for join options
       const keyboard = Markup.inlineKeyboard([
-        [
-          Markup.button.callback("🔍 Browse Public Groups", "browse_groups"),
-          Markup.button.callback("🔗 Join with ID", "join_with_id"),
-        ],
+        [Markup.button.callback("🔍 Browse Public Groups", "browse_groups")],
         [Markup.button.callback("📋 My Groups", "my_groups")],
-        [Markup.button.callback("❓ How to Join", "join_help")],
+        [
+          Markup.button.callback("🔗 Join with ID", "join_with_id"),
+          Markup.button.callback(" Back", "back_to_group_menu"),
+        ],
       ]);
 
       await sendOrEdit(ctx, joinGroupMessage, {
@@ -152,11 +146,15 @@ With group trading, you and your members can:
         await ctx.reply("❌ No group found in this chat.");
         return;
       }
+      const grpInfo = await BlockchainServiceFactory.detectAndGetService(
+        group.blockchain_type
+      ).fetchGroupInfo(group.group_address);
+      console.log("Fetched group info group callback handler:", grpInfo.data);
 
       // Get financial summary for member details
       const financialSummary = getGroupFinancialSummary(group);
 
-      let membersMessage = `👥 **Members (${group.members.length})**\n\n`;
+      let membersMessage = `👥 **Members (${grpInfo.data.members.length})**\n\n`;
 
       // Sort members by contribution (highest first)
       const sortedMembers = [...group.members].sort(
@@ -170,11 +168,12 @@ With group trading, you and your members can:
         const sharePercentage = shareInfo ? shareInfo.share_percentage : 0;
         const role = member.role === "trader" ? "🛠️ Trader" : "👤 Member";
 
-        membersMessage += `${index + 1}. ${role} - $${member.contribution
-          } (${sharePercentage}%)\n`;
+        membersMessage += `${index + 1}. ${role} - $${
+          member.contribution
+        } (${sharePercentage}%)\n`;
       });
 
-      membersMessage += `\n**Total Balance:** 00 SOL`;
+      membersMessage += `\n**Total Balance:** ${grpInfo.data.totalContributions} ${(grpInfo.data.currency as any) || "SOL"}\n`;
 
       const keyboard = Markup.inlineKeyboard([
         [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
@@ -210,7 +209,10 @@ With group trading, you and your members can:
       }
 
       // Check if user is a member
-      const isMember = await GroupService.isUserMember(group._id.toString(), userId);
+      const isMember = await GroupService.isUserMember(
+        group._id.toString(),
+        userId
+      );
       if (!isMember) {
         await ctx.reply("❌ You are not a member of this group.");
         return;
@@ -511,49 +513,6 @@ Public group browsing will be available in a future update.
     }
   }
 
-  static async handleJoinHelp(ctx: Context): Promise<void> {
-    try {
-      await ctx.answerCbQuery("❓ Join Help");
-
-      const helpMessage = `
-❓ **How to Join a Group**
-
-**Step 1: Get a Group ID**
-• Ask a group creator or admin for their group ID
-• Group IDs look like: \`507f1f77bcf86cd799439011\`
-
-**Step 2: Join the Group**
-• Use: \`/join <group_id>\`
-• Example: \`/join 507f1f77bcf86cd799439011\`
-
-**Step 3: Contribute Funds**
-• Send your contribution to the group
-• Your share will be calculated based on contribution
-
-**Step 4: Start Voting**
-• Vote on trading decisions
-• Share in the profits!
-
-**Requirements:**
-• You must be registered (use /start first)
-• Group must have space for new members
-• Group must be active (not ended)
-      `;
-
-      const keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
-      ]);
-
-      await sendOrEdit(ctx, helpMessage, {
-        parse_mode: "Markdown",
-        ...keyboard,
-      });
-    } catch (error) {
-      console.error("Join help error:", error);
-      await ctx.answerCbQuery("❌ Failed to show join help.");
-    }
-  }
-
   static async handleGroupStats(ctx: Context): Promise<void> {
     try {
       await ctx.answerCbQuery("📊 Group Stats");
@@ -585,8 +544,9 @@ Public group browsing will be available in a future update.
 
 **📈 Performance:**
 • Total Trades: ${group.trades.length}
-• Successful Trades: ${executedPolls.filter((p: any) => p.type === "trade").length
-        }
+• Successful Trades: ${
+        executedPolls.filter((p: any) => p.type === "trade").length
+      }
 • Active Polls: ${activePolls.length}
 • Total Polls: ${group.polls.length}
 
@@ -600,8 +560,9 @@ Public group browsing will be available in a future update.
 • Total Members: ${group.members.length}
 • Max Capacity: 000
 • Traders: ${group.members.filter((m: any) => m.role === "trader").length}
-• Regular Members: ${group.members.filter((m: any) => m.role === "member").length
-        }
+• Regular Members: ${
+        group.members.filter((m: any) => m.role === "member").length
+      }
 
 **⚙️ Settings:**
 • Group Status: 
@@ -674,189 +635,6 @@ Public group browsing will be available in a future update.
     }
   }
 
-  // Add bot to Telegram group handler
-  static async handleAddBotToGroup(ctx: Context): Promise<void> {
-    try {
-      await ctx.answerCbQuery("🤖 Add Bot to Group");
-
-      const addBotMessage = `
-🤖 **Add Jumpa Bot to Your Telegram Group**
-
-**Step 1: Add the Bot**
-1. Go to your Telegram group
-2. Click on the group name at the top
-3. Click "Add Members" or "Add Admins"
-4. Search for: \`@JumpaSTradingBot\` (or your bot username)
-5. Add the bot to the group
-
-**Step 2: Give Bot Permissions**
-The bot needs these permissions:
-• ✅ Read messages
-• ✅ Send messages
-• ✅ Delete messages (for cleanup)
-• ✅ Pin messages (for important polls)
-
-**Step 3: Create Group**
-Once the bot is added to your Telegram group:
-1. Use \`/start\` in the group to initialize
-2. Use \`/create_group <name> <max_members> <type>\` to create your group
-3. Share the group ID with members
-4. Start trading!
-
-**Bot Commands for Groups:**
-• \`/create_group\` - Create group
-• \`/info\` - View group info
-• \`/members\` - See members
-• \`/poll trade <token> <amount>\` - Create trade poll
-• \`/vote <poll_id> <yes/no>\` - Vote on polls
-
-**Important Notes:**
-• The bot must be added to the group before creating group
-• Only group admins can create groups
-• All group members can join and participate
-• The bot will manage polls and voting automatically
-
-**Need Help?**
-• Use \`/help\` in the group for command list
-• Contact support if you have issues
-      `;
-
-      // Create inline keyboard for bot setup
-      const keyboard = Markup.inlineKeyboard([
-        [
-          Markup.button.url(
-            "🔗 Add Bot to Group",
-            "https://t.me/JumpaSTradingBot?startgroup=true"
-          ),
-        ],
-        [
-          Markup.button.callback("📋 Bot Commands", "bot_commands_help"),
-          Markup.button.callback("⚙️ Bot Permissions", "bot_permissions_help"),
-        ],
-        [Markup.button.callback("🔄 Refresh", "add_bot_to_group")],
-      ]);
-
-      await sendOrEdit(ctx, addBotMessage, {
-        parse_mode: "Markdown",
-        ...keyboard,
-      });
-    } catch (error) {
-      console.error("Add bot to group error:", error);
-      await ctx.answerCbQuery("❌ Failed to show bot setup instructions.");
-    }
-  }
-
-  // Bot commands help handler
-  static async handleBotCommandsHelp(ctx: Context): Promise<void> {
-    try {
-      await ctx.answerCbQuery("📋 Bot Commands");
-
-      const commandsMessage = `
-📋 **Jumpa Bot Commands**
-
-**Group Management:**
-• \`/create_group <name> <max_members> <amount>\` - Create group
-• \`/info\` - View group information
-• \`/members\` - List group members
-• \`/polls\` - Show active polls
-• \`/balance\` - Show your balance
-• \`/join <group_id>\` - Join a group
-
-**Polling & Voting:**
-• \`/poll trade <token> <amount>\` - Create trade poll (traders only)
-• \`/poll end\` - Create end poll (traders only)
-• \`/vote <poll_id> <yes/no>\` - Vote on polls
-• \`/poll results <poll_id>\` - View poll results
-• \`/poll execute <poll_id>\` - Execute poll (traders only)
-
-**User Management:**
-• \`/start\` - Initialize bot and create wallet
-• \`/wallet\` - View wallet information
-• \`/profile\` - View user profile
-• \`/help\` - Show help message
-
-**Examples:**
-• \`/create_group CryptoCrew 10 0.1\`
-• \`/poll trade BONK 1000\`
-• \`/vote 507f1f77bcf86cd799439012 yes\`
-• \`/join 507f1f77bcf86cd799439011\`
-
-**Roles:**
-• **Creator**: Automatically becomes trader
-• **Trader**: Can create polls and execute trades
-• **Member**: Can vote on polls and contribute funds
-      `;
-
-      const keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
-      ]);
-
-      await sendOrEdit(ctx, commandsMessage, {
-        parse_mode: "Markdown",
-        ...keyboard,
-      });
-    } catch (error) {
-      console.error("Bot commands help error:", error);
-      await ctx.answerCbQuery("❌ Failed to show commands.");
-    }
-  }
-
-  // Bot permissions help handler
-  static async handleBotPermissionsHelp(ctx: Context): Promise<void> {
-    try {
-      await ctx.answerCbQuery("⚙️ Bot Permissions");
-
-      const permissionsMessage = `
-⚙️ **Required Bot Permissions**
-
-**Essential Permissions:**
-• ✅ **Read Messages** - Bot needs to read commands and messages
-• ✅ **Send Messages** - Bot needs to send responses and notifications
-• ✅ **Delete Messages** - Bot needs to clean up old polls and messages
-• ✅ **Pin Messages** - Bot needs to pin important polls and announcements
-
-**Optional Permissions:**
-• 🔄 **Edit Messages** - For updating poll status in real-time
-• 📎 **Send Media** - For sending charts and trading data
-• 👥 **Invite Users** - For adding members to groups (future feature)
-
-**How to Set Permissions:**
-1. Add bot to your group
-2. Go to group settings
-3. Click "Administrators"
-4. Find the bot in the list
-5. Click on the bot
-6. Enable the required permissions
-7. Save changes
-
-**Permission Issues:**
-If the bot doesn't work properly:
-• Check that all essential permissions are enabled
-• Make sure the bot is not restricted
-• Try removing and re-adding the bot
-• Contact support if issues persist
-
-**Security Note:**
-The bot only needs these permissions to function properly. It won't:
-• Access your personal messages
-• Share your data with third parties
-• Perform unauthorized actions
-      `;
-
-      const keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback("🔙 Back to Groups", "back_to_group_menu")],
-      ]);
-
-      await sendOrEdit(ctx, permissionsMessage, {
-        parse_mode: "Markdown",
-        ...keyboard,
-      });
-    } catch (error) {
-      console.error("Bot permissions help error:", error);
-      await ctx.answerCbQuery("❌ Failed to show permissions info.");
-    }
-  }
-
   /**
    * Handle refresh group management panel
    */
@@ -896,7 +674,7 @@ The bot only needs these permissions to function properly. It won't:
         ],
         [
           Markup.button.callback("🔄 Refresh", "group_manage_refresh"),
-          Markup.button.callback("🔙 Back to Main Menu", "back_to_menu"),
+          Markup.button.callback("🔙 Back to Group Menu", "back_to_group_menu"),
         ],
       ]);
 

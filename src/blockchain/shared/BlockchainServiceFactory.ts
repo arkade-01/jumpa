@@ -18,10 +18,23 @@ export class BlockchainServiceFactory {
    * @param addressOrType Either a blockchain address (string) or BlockchainType enum
    * @returns IBlockchainService instance for the appropriate blockchain
    */
-  static getService(addressOrType: string | BlockchainType): IBlockchainService {
-    const type = typeof addressOrType === "string"
-      ? BlockchainDetector.detectBlockchainType(addressOrType)
-      : addressOrType;
+  static getService(
+    addressOrType: string | BlockchainType
+  ): IBlockchainService {
+    let type: BlockchainType;
+
+    // Check if it's a BlockchainType enum value (which could be "base" or "solana")
+    if (
+      addressOrType === BlockchainType.BASE ||
+      addressOrType === BlockchainType.SOLANA
+    ) {
+      type = addressOrType as BlockchainType;
+    } else if (typeof addressOrType === "string") {
+      // It's a blockchain address, detect the type
+      type = BlockchainDetector.detectBlockchainType(addressOrType);
+    } else {
+      throw new Error(`Invalid blockchain type or address: ${addressOrType}`);
+    }
 
     switch (type) {
       case BlockchainType.BASE:

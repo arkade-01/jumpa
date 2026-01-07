@@ -2,7 +2,7 @@ import { Connection, clusterApiUrl } from "@solana/web3.js";
 import { config } from "@core/config/environment";
 
 let connection: Connection | null = null;
-const api_url = config.alchemyDevnetRpc;
+const api_url = config.alchemyMainnetRpc;
 
 export const getSolanaConnection = (): Connection => {
   if (!connection) {

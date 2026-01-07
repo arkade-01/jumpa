@@ -1,44 +1,28 @@
-/**
- * Bank codes for Yara payment widget
- * These are different from Paystack bank codes
- */
 
-export interface YaraBankCode {
-  name: string;
-  code: string;
-}
-
-import { YaraBanks } from "@src/features/payments/utils/yaraBanks";
-
-export interface YaraBankCode {
-  name: string;
-  code: string;
-}
-
-export const yaraBankCodes: YaraBankCode[] = YaraBanks;
+import { paystackBanks } from "@src/features/payments/utils/paystackBankCodes";
 
 /**
- * Find Yara bank code by bank name (fuzzy matching)
+ * Find Paystack bank code by bank name (fuzzy matching)
  * @param bankName - Bank name to search for
  * @returns Bank code or null if not found
  */
-export function findYaraBankCode(bankName: string): string | null {
+export function findPaystackBankCode(bankName: string): string | null {
   const searchTerm = bankName.toLowerCase().trim();
 
   // Exact match first
-  const exactMatch = yaraBankCodes.find(
+  const exactMatch = paystackBanks.find(
     (bank) => bank.name.toLowerCase() === searchTerm
   );
   if (exactMatch) return exactMatch.code;
 
   // Partial match (contains)
-  const partialMatch = yaraBankCodes.find((bank) =>
+  const partialMatch = paystackBanks.find((bank) =>
     bank.name.toLowerCase().includes(searchTerm)
   );
   if (partialMatch) return partialMatch.code;
 
   // Reverse partial match (search term contains bank name)
-  const reverseMatch = yaraBankCodes.find((bank) =>
+  const reverseMatch = paystackBanks.find((bank) =>
     searchTerm.includes(bank.name.toLowerCase())
   );
   if (reverseMatch) return reverseMatch.code;
@@ -50,34 +34,34 @@ export function findYaraBankCode(bankName: string): string | null {
     "gtbank": "Guaranty Trust Bank",
     "guaranty": "Guaranty Trust Bank",
     "uba": "United Bank for Africa",
-    "fcmb": "First City Monument Bank (FCMB)",
-    "first bank": "First Bank PLC",
-    "zenith": "Zenith Bank PLC",
+    "fcmb": "First City Monument Bank",
+    "first bank": "First Bank of Nigeria",
+    "zenith": "Zenith Bank PLC", // Verify Paystack name if possible, usually just Zenith Bank
     "access": "Access Bank",
-    "union": "Union Bank PLC",
-    "eco bank": "EcoBank PLC",
-    "ecobank": "EcoBank PLC",
+    "union": "Union Bank PLC", // Verify Paystack name
+    "eco bank": "Ecobank Nigeria",
+    "ecobank": "Ecobank Nigeria",
     "fidelity": "Fidelity Bank",
     "stanbic": "Stanbic IBTC Bank",
-    "wema": "Wema Bank PLC",
+    "wema": "ALAT by WEMA", // Or Wema Bank
     "polaris": "Polaris Bank",
     "keystone": "Keystone Bank",
-    "sterling": "Sterling Bank PLC",
-    "providus": "ProvidusBank PLC",
-    "unity": "Unity Bank PLC",
+    "sterling": "Sterling Bank",
+    "providus": "Providus Bank",
+    "unity": "Unity Bank PLC", // Verify Paystack name
     "jaiz": "Jaiz Bank",
-    "titan": "Titan Trust Bank",
-    "moniepoint": "Moniepoint Microfinance Bank",
-    "opay": "Opay",
-    "paycom": "Opay",
-    "kuda": "Kuda",
-    "palmpay": "PALMPAY",
-    "palm pay": "PALMPAY",
+    "titan": "Titan Bank",
+    "moniepoint": "Moniepoint MFB",
+    "opay": "OPay Digital Services Limited (OPay)",
+    "paycom": "OPay Digital Services Limited (OPay)",
+    "kuda": "Kuda Bank",
+    "palmpay": "PalmPay",
+    "palm pay": "PalmPay",
   };
 
   const aliasMatch = aliases[searchTerm];
   if (aliasMatch) {
-    const bank = yaraBankCodes.find(
+    const bank = paystackBanks.find(
       (b) => b.name.toLowerCase() === aliasMatch.toLowerCase()
     );
     if (bank) return bank.code;

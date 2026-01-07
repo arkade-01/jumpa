@@ -13,7 +13,8 @@ import {
   JoinData,
   LeaveData,
   DepositData,
-  CloseData
+  CloseData,
+  BlacklistData
 } from "../shared/types/CommonTypes";
 import { BlockchainDetector, ResponseMapper, BlockchainErrorHandler } from "../shared/utils";
 import User from "@core/database/models/user";
@@ -26,6 +27,7 @@ import { closeGroup, CloseGroupParams } from "./closeGroup";
 import { deposit, DepositParams } from "./deposit";
 import { fetchGroupAccount } from "./fetchData";
 import { deriveGroupPDA } from "./utils";
+import { addToBlacklist } from "./manageBlacklist";
 
 export class SolanaBlockchainService implements IBlockchainService {
   // ===== METADATA =====

@@ -50,7 +50,6 @@ export const DepositBaseGroup = async (
   );
   try {
     const minDeposit = await getMinimumDeposit(contractAddress);
-    console.log("minDeposit", minDeposit);
     if (!minDeposit.success) {
       return {
         success: false,
@@ -59,7 +58,10 @@ export const DepositBaseGroup = async (
     } else if (minDeposit.data.formattedMinDeposit > amount) {
       return {
         success: false,
-        data: minDeposit.data,
+        data:
+          "Deposit amount is less than minimum required deposit of " +
+          minDeposit.data.formattedMinDeposit +
+          " ETH",
       };
     }
   } catch (error) {
@@ -72,13 +74,9 @@ export const DepositBaseGroup = async (
   try {
     // Call deposit function - this is a transaction, not a view function
 
-    const depositTx = await contractWithSigner.deposit(
-      ethers.ZeroAddress,
-      0,
-      {
-        value: ethers.parseEther(amount.toString()),
-      }
-    );
+    const depositTx = await contractWithSigner.deposit(ethers.ZeroAddress, 1, {
+      value: ethers.parseEther(amount.toString()),
+    });
     console.log("---- Deposit Transaction ----", depositTx);
 
     // Wait for transaction to be mined

@@ -107,7 +107,13 @@ export interface LeaveData {
   timestamp?: string;
   hash?: string;
 }
-
+export interface BlacklistData {
+  address: string;
+  blacklistedBy: string;
+  timestamp: string;
+  hash: string;
+  blockNumber: number;
+}
 /**
  * Deposit data
  */

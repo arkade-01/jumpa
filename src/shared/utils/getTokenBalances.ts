@@ -121,46 +121,31 @@ export async function getAllTokenBalances(
     const cacheAge = now - lastUpdated;
     const isCacheValid = cacheAge < CACHE_DURATION && !forceRefresh;
 
-    if (isCacheValid) {
-      // Return cached values
-      console.log(`Using cached token balances for ${walletAddress} (age: ${Math.round(cacheAge / 1000)}s) usdc - ${wallet.usdcBalance}, usdt - ${wallet.usdtBalance}`);
+    // Check if we have ever fetched data (not default epoch date)
+    const hasData = lastUpdated > 0;
+
+    // Use SWR only if we have data AND we are not forcing a refresh
+    if (hasData && !forceRefresh) {
+      console.log(`Solana Cache status: ${isCacheValid ? 'Valid' : 'Stale'} (age: ${Math.round(cacheAge / 1000)}s)`);
+
+      if (!isCacheValid) {
+        console.log(`Triggering background Solana refresh for ${walletAddress}`);
+        refreshTokenBalancesInBackground(walletAddress, walletIndex).catch(err =>
+          console.error('Background Solana refresh failed:', err)
+        );
+      } else {
+        console.log(`Using valid cached Solana balances for ${walletAddress}`);
+      }
+
       return {
         usdc: wallet.usdcBalance || 0,
         usdt: wallet.usdtBalance || 0
       };
     }
 
-    // Cache expired or force refresh - fetch fresh data
-    console.log(`Fetching fresh token balances for ${walletAddress}`);
-    const [usdc, usdt] = await Promise.all([
-      fetchUSDCBalance(walletAddress),
-      fetchUSDTBalance(walletAddress)
-    ]);
-
-    // Use findOneAndUpdate with atomic operation to avoid race conditions
-    const updateResult = await User.findOneAndUpdate(
-      {
-        'solanaWallets.address': walletAddress
-      },
-      {
-        $set: {
-          [`solanaWallets.${walletIndex}.usdcBalance`]: usdc,
-          [`solanaWallets.${walletIndex}.usdtBalance`]: usdt,
-          [`solanaWallets.${walletIndex}.last_updated_token_balance`]: new Date()
-        }
-      },
-      {
-        new: true,
-        runValidators: true
-      }
-    ).exec();
-
-    if (updateResult) {
-      console.log(`Token balances saved for ${walletAddress} at index ${walletIndex}: USDC=${usdc}, USDT=${usdt}`);
-    } else {
-      console.error(`Failed to update token balances for ${walletAddress}`);
-    }
-
+    // Never fetched before -> Must wait for fetch
+    console.log(`No cached Solana data found. Fetching fresh token balances for ${walletAddress}...`);
+    const [usdc, usdt] = await refreshTokenBalances(walletAddress, walletIndex);
     return { usdc, usdt };
   } catch (error) {
     console.error('Error fetching token balances:', error);
@@ -187,4 +172,37 @@ export async function getAllTokenBalances(
 
     return { usdc: 0, usdt: 0 };
   }
+}
+
+/**
+ * Update token balances in database and return values
+ */
+async function refreshTokenBalances(walletAddress: string, walletIndex: number): Promise<[number, number]> {
+  const [usdc, usdt] = await Promise.all([
+    fetchUSDCBalance(walletAddress),
+    fetchUSDTBalance(walletAddress)
+  ]);
+
+  // Update DB
+  await User.findOneAndUpdate(
+    { 'solanaWallets.address': walletAddress },
+    {
+      $set: {
+        [`solanaWallets.${walletIndex}.usdcBalance`]: usdc,
+        [`solanaWallets.${walletIndex}.usdtBalance`]: usdt,
+        [`solanaWallets.${walletIndex}.last_updated_token_balance`]: new Date()
+      }
+    },
+    { new: true }
+  ).exec();
+
+  console.log(`Solana balances synced for ${walletAddress}`);
+  return [usdc, usdt];
+}
+
+/**
+ * Wrapper for background execution
+ */
+async function refreshTokenBalancesInBackground(walletAddress: string, walletIndex: number): Promise<void> {
+  await refreshTokenBalances(walletAddress, walletIndex);
 }

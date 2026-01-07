@@ -68,21 +68,15 @@ Choose an option below to get started:`;
   // User has wallet, show normal menu
   const firstName = ctx.from?.first_name || username;
 
-  // Fetch USDT and USDC balance for Solana only if user has Solana wallet
-  let tokenBalances = null;
-  if (hasSolanaWallet) {
-    tokenBalances = await getAllTokenBalances(user.solanaWallets[0].address);
-  }
-
-  // Check if user has EVM wallet
-  // const hasEvmWallet =
-  //   user.evmWallets && user.evmWallets.length > 0 && user.evmWallets[0].address;
-
-  let evmBalances = null;
-  if (hasEvmWallet) {
-    // Fetch EVM balances for Celo and Base
-    evmBalances = await getAllEvmBalances(user.evmWallets[0].address);
-  }
+  // Fetch balances in parallel
+  const [tokenBalances, evmBalances] = await Promise.all([
+    hasSolanaWallet
+      ? getAllTokenBalances(user.solanaWallets[0].address)
+      : Promise.resolve(null),
+    hasEvmWallet
+      ? getAllEvmBalances(user.evmWallets[0].address)
+      : Promise.resolve(null)
+  ]);
 
   // Build welcome message
   let welcomeMessage = `Welcome to Jumpa Bot, ${firstName}!

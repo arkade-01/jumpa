@@ -1,4 +1,5 @@
-export const banks = [
+// paystack supported bank codes
+export const paystackBanks = [
   {
     "name": "78 Finance Company Ltd",
     "code": "40195"

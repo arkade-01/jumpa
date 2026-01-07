@@ -9,7 +9,7 @@ import { config } from '@core/config/environment';
  */
 export async function convertNGNToCrypto(
   ngnAmount: number,
-  currency: 'SOL' | 'USDC' | 'USDT' | 'ETH',
+  currency: 'SOL' | 'USDC' | 'USDT' | 'ETH' | 'CELO',
   chain: 'SOLANA' | 'BASE' | 'CELO'
 ): Promise<number> {
   try {
@@ -34,13 +34,12 @@ export async function convertNGNToCrypto(
     let cryptoAmount: number;
 
     if (currency === 'SOL') {
-      // rate.data.sell.SOL is SOL per USD, so multiply
       cryptoAmount = usdAmount * rate.data.sell.SOL;
     } else if (currency === 'ETH') {
-      // rate.data.sell.ETH is ETH per USD, so multiply
       cryptoAmount = usdAmount * rate.data.sell.ETH;
+    } else if (currency === 'CELO') {
+      cryptoAmount = usdAmount * rate.data.sell.CELO;
     } else if (currency === 'USDC' || currency === 'USDT') {
-      // USDC and USDT are stablecoins, 1:1 with USD
       cryptoAmount = usdAmount;
     } else {
       throw new Error(`Unsupported currency: ${currency}`);
@@ -69,8 +68,57 @@ export async function convertNGNToCrypto(
 export function getCurrenciesForChain(chain: 'SOLANA' | 'BASE' | 'CELO'): string[] {
   if (chain === 'SOLANA') {
     return ['SOL', 'USDC', 'USDT'];
-  } else if (chain === 'BASE' || chain === 'CELO') {
+  } else if (chain === 'CELO') {
+    return ['CELO', 'ETH', 'USDC', 'USDT'];
+  } else if (chain === 'BASE') {
     return ['ETH', 'USDC', 'USDT'];
   }
   return [];
+}
+
+/**
+ * Converts cryptocurrency amount to NGN using current exchange rates
+ * @param cryptoAmount - Amount in cryptocurrency
+ * @param currency - Cryptocurrency (SOL, USDC, USDT, ETH)
+ * @param chain - Blockchain (SOLANA, BASE, CELO)
+ * @returns NGN amount
+ */
+export async function convertCryptoToNGN(
+  cryptoAmount: number,
+  currency: 'SOL' | 'USDC' | 'USDT' | 'ETH' | 'CELO',
+  chain: 'SOLANA' | 'BASE' | 'CELO'
+): Promise<number> {
+  try {
+    const rateUrl = config.paymentRateUrl;
+
+    if (!rateUrl) {
+      throw new Error('Exchange rate URL not configured');
+    }
+
+    const exchangeRateResponse = await fetch(rateUrl);
+    const rate = await exchangeRateResponse.json();
+
+    // Convert crypto to USD first
+    let usdAmount: number;
+
+    if (currency === 'SOL') {
+      usdAmount = cryptoAmount / rate.data.sell.SOL;
+    } else if (currency === 'ETH') {
+      usdAmount = cryptoAmount / rate.data.sell.ETH;
+    } else if (currency === 'CELO') {
+      usdAmount = cryptoAmount / rate.data.sell.CELO; // will throw an error since our LP doesnt support CELO token
+    } else if (currency === 'USDC' || currency === 'USDT') {
+      usdAmount = cryptoAmount;
+    } else {
+      throw new Error(`Unsupported currency: ${currency}`);
+    }
+
+    // Convert USD to NGN
+    const ngnAmount = usdAmount * rate.data.sell.NGN;
+
+    return Math.round(ngnAmount * 100) / 100; // Round to 2 decimal places
+  } catch (error: any) {
+    console.error('[Currency Conversion] Error:', error);
+    throw new Error(`Failed to convert currency: ${error.message}`);
+  }
 }

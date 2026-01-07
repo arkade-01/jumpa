@@ -2,6 +2,7 @@ import { Context } from "telegraf";
 import getUser from "@features/users/getUserInfo";
 import { Markup } from "telegraf";
 import { getAllTokenBalances } from "@shared/utils/getTokenBalances";
+import { getAllEvmBalances } from "@shared/utils/getEvmBalances";
 import { sendOrEdit } from "@shared/utils/messageHelper";
 
 export class WalletViewHandlers {
@@ -67,25 +68,31 @@ Set up a wallet to start trading!`;
         for (let index = 0; index < solanaWallets.length; index++) {
           const wallet = solanaWallets[index];
           const balance = wallet.balance?.toFixed(4) || "0.0000";
-          
+
           // Fetch USDC and USDT balances for this wallet
           const tokenBalances = await getAllTokenBalances(wallet.address);
 
           const defaultBadge = index === 0 ? " 🟢 <b>(Default)</b>\n" : "";
           walletMessage += `\n<code>${wallet.address}</code>${defaultBadge}\n`;
-          walletMessage += `SOL: ${balance}   • USDC: ${tokenBalances.usdc.toFixed(1)}   • USDT: ${tokenBalances.usdt.toFixed(1)}\n`;        }
+          walletMessage += `SOL: ${balance}   • USDC: ${tokenBalances.usdc.toFixed(1)}   • USDT: ${tokenBalances.usdt.toFixed(1)}\n`;
+        }
         walletMessage += `\n`;
       }
 
       // Display EVM wallets
       if (evmWallets.length > 0) {
         walletMessage += `<b>🔵 EVM Wallets (${evmWallets.length}/3)</b>\n`;
-        evmWallets.forEach((wallet, index) => {
-          const balance = wallet.balance?.toFixed(4) || "0.0000";
+
+        for (let index = 0; index < evmWallets.length; index++) {
+          const wallet = evmWallets[index];
+          const balances = await getAllEvmBalances(wallet.address);
+
           const defaultBadge = index === 0 ? " 🟢 <b>(Default)</b>\n" : "";
           walletMessage += `\n<code>${wallet.address}</code>${defaultBadge}\n`;
-          walletMessage += `${balance} ETH\n`;
-        });
+
+          walletMessage += `<b>Base:</b> ${balances.BASE.eth.toFixed(4)} ETH • ${balances.BASE.usdc.toFixed(1)} USDC\n`;
+          walletMessage += `<b>Celo:</b> ${balances.CELO.eth.toFixed(4)} ETH • ${balances.CELO.usdc.toFixed(1)} cUSD\n`;
+        }
         walletMessage += `\n`;
       }
 

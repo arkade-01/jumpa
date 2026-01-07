@@ -88,6 +88,7 @@ export async function createBaseGroup(
         telegram_chat_id: chatId,
         is_private: !type,
         group_address: groupAddress,
+        blockchain_type: "base",
         onchain_tx_signature: receipt.hash,
         members: [
           {

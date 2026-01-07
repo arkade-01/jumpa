@@ -12,7 +12,8 @@ import {
   JoinData,
   LeaveData,
   DepositData,
-  CloseData
+  CloseData,
+  BlacklistData
 } from "../types/CommonTypes";
 
 export interface IBlockchainService {
@@ -89,6 +90,18 @@ export interface IBlockchainService {
     ctx: Context,
     groupAddress: string
   ): Promise<BlockchainResponse<LeaveData>>;
+
+  /**
+   * Add an address to the group's blacklist
+   * @param ctx Telegram context
+   * @param groupAddress The on-chain address of the group
+   * @param addressToBlacklist The address to add to blacklist
+   */
+  // addToBlacklist(
+  //   ctx: Context,
+  //   groupAddress: string,
+  //   addressToBlacklist: string
+  // ): Promise<BlockchainResponse<BlacklistData>>;
 
   // ===== FINANCIAL OPERATIONS =====
 

@@ -27,6 +27,9 @@
     // "moduleResolution": "node10",                     /* Specify how TypeScript looks up a file from a given module specifier. */
     "baseUrl": "./src", /* Specify the base directory to resolve non-relative module names. */
     "paths": {
+      "@src/*": [
+        "*"
+      ],
       "@core/*": [
         "core/*"
       ],
@@ -126,8 +129,9 @@
   },
   "include": [
     "src/**/*",
-    "src/index.ts"
-, "scripts/getBankCode.js"  ],
+    "src/index.ts",
+    "scripts/getBankCode.js"
+  ],
   "exclude": [
     "node_modules",
     "dist",

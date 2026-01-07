@@ -10,7 +10,7 @@ export function buildPrivateChatKeyboard(): {
 } {
   return Markup.inlineKeyboard([
     [
-      Markup.button.callback(" View Wallet", "view_wallet"),
+      Markup.button.callback(" Manage Wallets", "view_wallet"),
       Markup.button.callback(" My Profile", "view_profile"),
     ],
     [

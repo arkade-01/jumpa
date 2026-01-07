@@ -2,6 +2,7 @@ import { Context, Markup } from "telegraf";
 import { displayMainMenu } from "@features/onboarding/utils/displayMainMenu";
 import { sendOrEdit } from "@shared/utils/messageHelper";
 import { GroupService } from "@features/groups/services/groupService";
+import { BlockchainServiceFactory } from "@blockchain/shared/BlockchainServiceFactory";
 
 export class MenuHandlers {
   // Handle back to main menu callback
@@ -25,7 +26,9 @@ export class MenuHandlers {
     }
   }
 
-  // Handle back to group menu callback
+  /**
+   * Handle back to group menu callback
+   */
   static async handleBackToGroupMenu(ctx: Context): Promise<void> {
     try {
       if (!ctx.from?.id) {
@@ -60,9 +63,7 @@ export class MenuHandlers {
             Markup.button.callback("🏠 Create Group", "create_group"),
             Markup.button.callback("👥 Join Group", "join"),
           ],
-          [
-            Markup.button.callback("🔙 Back to Main Menu", "back_to_menu"),
-          ],
+          [Markup.button.callback("🔙 Back to Main Menu", "back_to_menu")],
         ]);
 
         await sendOrEdit(ctx, groupMenuMessage, {
@@ -73,13 +74,27 @@ export class MenuHandlers {
       }
 
       // Group exists - show group management panel
-      const managementMessage = `
- **${group.name}**
+      //get group info on chain
 
-**Group ID:** \`${group._id}\`
-**Type:** ${group.is_private ? "🔒 Private (requires approval)" : "🌐 Public (auto-approved)"}
-**Status:** ${(group as any).status === "active" ? "🟢 Active" : "🔴 Ended"}
-**Balance:** ${(group as any).current_balance || 0} SOL
+      const grpInfo = await BlockchainServiceFactory.detectAndGetService(
+        group.blockchain_type
+      ).fetchGroupInfo(group.group_address);
+      console.log("Fetched group info menu handler:", grpInfo);
+      const managementMessage = `
+ **Group: ${grpInfo.data.name}**
+
+**Group ID:** \`${grpInfo.data.groupAddress}\`
+**Type:** ${
+        grpInfo.data.isPrivate
+          ? "🔒 Private (requires approval)"
+          : "🌐 Public (auto-approved)"
+      }
+**Status:** ${
+        (grpInfo.data.state as any) === "open" ? "🟢 Active" : "🔴 Paused"
+      }
+**Balance:** ${(grpInfo.data.totalContributions as any) || 0} ${
+        (grpInfo.data.currency as any) || "SOL"
+      }
       `;
 
       const keyboard = Markup.inlineKeyboard([
@@ -92,7 +107,6 @@ export class MenuHandlers {
           Markup.button.callback("➕ More Actions", "group_more_actions"),
         ],
         [
-          Markup.button.callback("🔄 Refresh", "group_manage_refresh"),
           Markup.button.callback("🔙 Back to Main Menu", "back_to_menu"),
         ],
       ]);

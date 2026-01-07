@@ -26,23 +26,23 @@ Contact @official_jumpa_bot for help!`;
 /**
  * About message content
  */
-export const ABOUT_MESSAGE = `ℹ️ **About Jumpa Bot**
+export const ABOUT_MESSAGE = `ℹ️ <b>About Jumpa Bot</b>
 
-**What is Jumpa?**
+<b>What is Jumpa?</b>
 Jumpa is a Telegram bot that enables collaborative trading through groups - traditional savings groups reimagined for the digital age.
 
-**Key Features:**
-🔑 **Auto-generated Solana wallets** for each user
-💰 **Collective fund pooling** with SOL
-🗳️ **Democratic voting** on trading decisions
-📊 **Transparent profit sharing** based on contributions
-🔒 **Secure smart contract integration**
+<b>Key Features:</b>
+  <b>Auto-generated wallets</b> for each user
+  <b>Collective fund pooling</b> with SOL or USDT
+  <b>Democratic voting</b> on trading decisions
+  <b>Transparent profit sharing</b> based on contributions
+  <b>Secure smart contract integration</b>
 
-**How It Works:**
-1. Create or join an group
-2. Contribute SOL to the group pool
-3. Vote on trading proposals
-4. Share profits based on your contribution
+<b>How It Works:</b>
+  1. Create or join an group
+  2. Contribute SOL or USDT to the group pool
+  3. Vote on trading proposals
+  4. Share profits based on your contribution
 `;
 
 /**
@@ -79,12 +79,12 @@ export function getAboutContent(includeKeyboard: boolean = false) {
 
     return {
       message: ABOUT_MESSAGE,
-      options: { parse_mode: "Markdown" as const, ...keyboard }
+      options: { parse_mode: "HTML" as const, ...keyboard }
     };
   }
 
   return {
     message: ABOUT_MESSAGE,
-    options: { parse_mode: "Markdown" as const }
+    options: { parse_mode: "HTML" as const }
   };
 }

@@ -13,7 +13,8 @@ import {
   JoinData,
   LeaveData,
   DepositData,
-  CloseData
+  CloseData,
+  BlacklistData
 } from "../shared/types/CommonTypes";
 import { BlockchainDetector, ResponseMapper, BlockchainErrorHandler } from "../shared/utils";
 
@@ -24,6 +25,7 @@ import { JoinBaseGroup } from "./joinGroup";
 import { LeaveBaseGroup } from "./leaveGroup";
 import { DepositBaseGroup } from "./groupDeposit";
 import { closeGroup } from "./closeGroup";
+import { addToBlacklist } from "./addToBlacklist";
 
 export class BaseBlockchainService implements IBlockchainService {
   // ===== METADATA =====
@@ -228,6 +230,44 @@ export class BaseBlockchainService implements IBlockchainService {
             contribution: result.data.contribution,
             timestamp: result.data.timestamp,
             hash: result.data.hash
+          },
+          transactionHash: result.data.hash,
+          blockNumber: result.data.blockNumber
+        };
+      }
+
+      return {
+        success: false,
+        error: result.data || "Unknown error occurred"
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: BlockchainErrorHandler.handle(error, BlockchainType.BASE)
+      };
+    }
+  }
+
+  async addToBlacklist(ctx: Context, groupAddress: string, addressToBlacklist: string): Promise<BlockchainResponse<BlacklistData>> {
+    try {
+      const result = await addToBlacklist(ctx, groupAddress, addressToBlacklist);
+
+      if (!result) {
+        return {
+          success: false,
+          error: "Failed to add to blacklist - no response"
+        };
+      }
+
+      if (result.success && result.data) {
+        return {
+          success: true,
+          data: {
+            address: result.data.address,
+            blacklistedBy: result.data.blacklistedBy,
+            timestamp: result.data.timestamp,
+            hash: result.data.hash,
+            blockNumber: result.data.blockNumber
           },
           transactionHash: result.data.hash,
           blockNumber: result.data.blockNumber

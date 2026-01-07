@@ -1,8 +1,8 @@
-import { Context } from "telegraf";
+import { Context, Markup } from "telegraf";
 import { BaseCommand } from "@telegram/commands/BaseCommand";
 import User from "@core/database/models/user";
 import { encodeBase62 } from "@shared/utils/base62";
-
+import { sendOrEdit } from "@shared/utils/messageHelper";
 export class ReferralCommand extends BaseCommand {
   name = "referral";
   description = "View referral stats and get referral link";
@@ -23,7 +23,10 @@ export class ReferralCommand extends BaseCommand {
       const user = await User.findOne({ telegram_id: telegramId });
 
       if (!user) {
-        await this.sendMessage(ctx, "❌ User not found. Please use /start first.");
+        await this.sendMessage(
+          ctx,
+          "❌ User not found. Please use /start first."
+        );
         return;
       }
 
@@ -54,9 +57,12 @@ export class ReferralCommand extends BaseCommand {
 
 Share your referral link with your friends and earn points for each friend who joins using your link, places a trade or withdraws via P2P!
 
-Tap the link above to copy and share it.`;
+Click the link above to copy and share it.`;
 
-      await ctx.reply(message, { parse_mode: "Markdown" });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🔙 Back to Main Menu", "back_to_menu")],
+      ]);
+      await sendOrEdit(ctx, message, { parse_mode: "Markdown", ...keyboard });
     } catch (error) {
       console.error("Referral command error:", error);
       await this.sendMessage(

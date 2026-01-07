@@ -11,12 +11,15 @@ import { GroupCallbackHandlers } from "@features/groups/callbacks/GroupCallbackH
 import { DepositHandlers } from "@features/groups/callbacks/DepositHandlers";
 import { CloseGroupHandlers } from "@features/groups/callbacks/CloseGroupHandlers";
 import { ExitGroupHandlers } from "@features/groups/callbacks/ExitGroupHandlers";
+import { DepositCommand } from "@features/payments/commands/DepositCommand";
+import { DepositCallbacks } from "@features/payments/callbacks/DepositCallbacks";
 import { BankHandler } from "@features/payments/commands/BankHandler";
 import {
   getWithdrawalState,
   clearWithdrawalState,
 } from "@shared/state/withdrawalState";
 import { getAIWithdrawalState } from "@shared/state/aiWithdrawalState";
+import { getDepositState } from "@shared/state/depositState";
 import {
   handleDetectToken,
   handleGroupToken,
@@ -72,6 +75,7 @@ export class CommandManager {
       new JoinGroupCommand(),
       new ReferralCommand(),
       new ImageTestCommand(),
+      new DepositCommand(),
     ];
 
     commandInstances.forEach((command) => {
@@ -144,6 +148,11 @@ export class CommandManager {
       StartCallbackHandlers.handleDeleteEVMWallet
     );
 
+    // Register deposit callback handlers
+    this.bot.action("deposit_from_bank", DepositCallbacks.handleFromBank);
+    this.bot.action(/^deposit_select_asset:/, DepositCallbacks.handleAssetSelection);
+    this.bot.action("deposit_confirm", DepositCallbacks.handleConfirmation);
+
     // Register referral callback handler
     this.bot.action("referral", async (ctx) => {
       const referralCommand = this.commands.get("referral");
@@ -188,15 +197,28 @@ export class CommandManager {
       WalletCallbackHandlers.handleWithdrawConfirmation
     );
 
+    this.bot.action(
+      "withdraw_onchain",
+      WalletCallbackHandlers.handleWithdrawOnChain
+    );
+    this.bot.action(
+      /^withdraw_onchain_asset:/,
+      WalletCallbackHandlers.handleWithdrawOnChainAsset
+    );
+    this.bot.action(
+      /^withdraw_onchain_amount:/,
+      WalletCallbackHandlers.handleWithdrawOnChainAmountSelection
+    );
+
     // Register AI withdrawal callback handlers
-    this.bot.action(
-      /^ai_withdraw_chain:/,
-      AICallbackHandler.handleChainSelection
-    );
-    this.bot.action(
-      /^ai_withdraw_currency:/,
-      AICallbackHandler.handleCurrencySelection
-    );
+    // this.bot.action(
+    //   /^ai_withdraw_chain:/,
+    //   AICallbackHandler.handleChainSelection
+    // );
+    // this.bot.action(
+    //   /^ai_withdraw_currency:/,
+    //   AICallbackHandler.handleCurrencySelection
+    // );
     this.bot.action(
       "ai_withdraw_cancel",
       AICallbackHandler.handleWithdrawalCancellation
@@ -345,6 +367,15 @@ export class CommandManager {
         } else if (withdrawalState.step === "awaiting_pin") {
           await WalletCallbackHandlers.handleWithdrawPinVerification(ctx);
           return;
+        } else if (withdrawalState.step === "awaiting_dest_address") {
+          await WalletCallbackHandlers.handleWithdrawAddressInput(ctx);
+          return;
+        } else if (withdrawalState.step === "awaiting_onchain_amount") {
+          await WalletCallbackHandlers.handleWithdrawOnChainAmountInput(ctx);
+          return;
+        } else if (withdrawalState.step === "awaiting_onchain_pin") {
+          await WalletCallbackHandlers.handleWithdrawOnChainPinVerification(ctx);
+          return;
         }
       }
 
@@ -375,15 +406,22 @@ export class CommandManager {
       }
 
       // Handle AI withdrawal bank name input
-      const aiWithdrawalState = getAIWithdrawalState(userId);
-      if (aiWithdrawalState?.step === "awaiting_bank_name") {
-        await AICallbackHandler.handleBankNameInput(ctx);
-        return;
-      }
+      // const aiWithdrawalState = getAIWithdrawalState(userId);
+      // if (aiWithdrawalState?.step === "awaiting_bank_name") {
+      //   await AICallbackHandler.handleBankNameInput(ctx);
+      //   return;
+      // }
 
       // Handle AI withdrawal PIN input
-      if (aiWithdrawalState?.step === "awaiting_pin") {
-        await AICallbackHandler.handlePINInput(ctx);
+      // if (aiWithdrawalState?.step === "awaiting_pin") {
+      //   await AICallbackHandler.handlePINInput(ctx);
+      //   return;
+      // }
+
+      // Handle Deposit amount input
+      const depositState = getDepositState(userId);
+      if (depositState?.step === "awaiting_amount") {
+        await DepositCallbacks.handleAmountInput(ctx);
         return;
       }
 
@@ -404,24 +442,12 @@ export class CommandManager {
       GroupCallbackHandlers.handleCreateGroupForm
     );
     this.bot.action("copy_group_id", GroupCallbackHandlers.handleCopyGroupId);
-    this.bot.action(
-      "add_bot_to_group",
-      GroupCallbackHandlers.handleAddBotToGroup
-    );
-    this.bot.action(
-      "bot_commands_help",
-      GroupCallbackHandlers.handleBotCommandsHelp
-    );
-    this.bot.action(
-      "bot_permissions_help",
-      GroupCallbackHandlers.handleBotPermissionsHelp
-    );
+
     this.bot.action("custom_create", GroupCallbackHandlers.handleCustomCreate);
     this.bot.action("group_help", GroupCallbackHandlers.handleGroupHelp);
     this.bot.action("browse_groups", GroupCallbackHandlers.handleBrowseGroups);
     this.bot.action("join_with_id", GroupCallbackHandlers.handleJoinWithId);
     this.bot.action("my_groups", GroupCallbackHandlers.handleMyGroups);
-    this.bot.action("join_help", GroupCallbackHandlers.handleJoinHelp);
     this.bot.action("group_stats", GroupCallbackHandlers.handleGroupStats);
 
     // Register deposit callback handlers
@@ -522,6 +548,7 @@ export class CommandManager {
         { command: "help", description: "Get help" },
         { command: "wallet", description: "Manage your wallet" },
         { command: "referral", description: "View referral info" },
+        { command: "deposit", description: "Deposit funds" },
         // { command: "image", description: "Test image features" },
       ];
 
