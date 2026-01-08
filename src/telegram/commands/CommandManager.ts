@@ -50,7 +50,7 @@ import { CreateGroupCommand } from "@features/groups/commands/CreateGroupCommand
 import { GroupCommand } from "@features/groups/commands/GroupCommand";
 import { GroupInfoCommand } from "@features/groups/commands/GroupInfoCommand";
 import { LeaveGroupCommand } from "@features/groups/commands/LeaveGroupCommand";
-import { AICallbackHandler } from "@features/payments/callbacks/AIWithdrawalCallback";
+import { AICallbackHandler } from "@features/payments/callbacks/AIAgentCallback";
 
 export class CommandManager {
   private commands: Map<string, BaseCommand> = new Map();
@@ -238,6 +238,10 @@ export class CommandManager {
     this.bot.action(
       "ai_withdraw_cancel",
       AICallbackHandler.handleWithdrawalCancellation
+    );
+    this.bot.action(
+      "confirm_amadeus_tx",
+      AICallbackHandler.handleAmadeusConfirmation
     );
 
     // Register delete message action (reusable for any command)

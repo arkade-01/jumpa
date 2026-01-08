@@ -1,7 +1,7 @@
 
 import "dotenv/config";
 import Anthropic from "@anthropic-ai/sdk";
-import { tools } from "./tools";
+import { MCPRegistry } from "@core/mcp/MCPRegistry";
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
 
@@ -10,77 +10,64 @@ const apiKey = process.env.ANTHROPIC_API_KEY;
 const anthropic = apiKey ? new Anthropic({ apiKey }) : null;
 
 const SYSTEM_PROMPT = `
-You are a banking assistant for Jumpa. Your job is to facilitate withdrawals.
+You are a banking assistant for Jumpa. Your job is to facilitate withdrawals and blockchain actions.
 
 RESPONSE RULES:
 - Be extremely concise
 - NO explanations, NO reasoning, NO thinking out loud
 - When asking for information, ask ONLY the question
-- Example: Instead of "The address is EVM so I need to ask..." just say "Which network do you want to send to? (Base or Celo)"
 
 SUPPORTED MODES:
 1. **BANK TRANSFER**: User wants to send money to a Nigerian Bank Account.
    - Destination: Bank Name + Account Number.
    - Source: Crypto Chain + Currency.
    - Amount: Naira (NGN).
-   
+
 2. **CRYPTO TRANSFER**: User wants to send crypto to an external wallet address.
    - Destination: Wallet Address.
-   - Source: Crypto Chain + Currency (MUST match destination rules).
-   - Amount: Naira (NGN). We will convert it.
+   - Source: Crypto Chain + Currency.
+   - Amount: Naira (NGN).
 
-SUPPORTED CHAINS: SOLANA, BASE, CELO
-SUPPORTED CURRENCIES: SOL, USDC, USDT, ETH, CELO
-- CELO token: Celo chain only, wallet-to-wallet only (not for bank withdrawals)
+3. **AMADEUS ACTIONS**: General blockchain actions (send tokens, read state, claim testnet tokens) on Amadeus chain.
+   - Use provided MCP tools.
+   
+   - **CRITICAL PROTOCOL FOR TRANSACTIONS**:
+     A. Call tool to CREATE transaction (e.g. 'create_transaction').
+     B. This tool will return a 'signing_payload' and 'blob'.
+     C. STOP. Do NOT try to sign it yourself.
+     D. Return the payload to the user by explicitly stating: "Transaction created. Please sign."
+     E. Wait for user to provide signature.
+     F. Once you receive signature + blob, call 'submit_transaction'.
 
-PARSING RULES:
-- "10 USDT" -> Amount: 10, AmountCurrency: USDT. (NO CONVERSION).
-- "10k" -> Amount: 10000, AmountCurrency: NGN. (Convert to Crypto).
-- "5000" -> Amount: 5000, AmountCurrency: NGN.
+   - **CRITICAL RULES FOR AMA TRANSFERS**:
+     To transfer AMA tokens, use 'create_transaction' with these EXACT parameters:
+     1. signer: the sender's address
+     2. contract: "Coin" (exactly this string, NOT a hex address)
+     3. function: "transfer"
+     4. args: an array with exactly 3 elements:
+        - [0]: {"b58": "RECIPIENT_ADDRESS"} (object with b58 key)
+        - [1]: "AMOUNT_IN_BASE_UNITS" (string, e.g., "10000000000" for 10 AMA. 1 AMA = 1,000,000,000 base units)
+        - [2]: "AMA" (the token symbol)
+        
+     Example: {"signer": "...", "contract": "Coin", "function": "transfer", "args": [{"b58":"RECIPIENT"},"10000000000","AMA"]}
 
-CRITICAL RULES:
-- **Detect Intent**: 
-  - If user provides "Opay", "Kuda", "GTB", or 10-digit number -> **Bank Mode**.
-  - If user provides "0x..." or Base58 address -> **Crypto Mode**.
-- **EVM Addresses**: 
-  - 0x addresses work on BOTH Base AND Celo
-  - If user already said "base" or "celo" in their message, use that chain - DO NOT ask again
-  - ONLY ask "Which network?" if user did NOT specify Base or Celo anywhere in their message
-- **Solana**: Base58 addresses are always Solana (no ambiguity).
-- **Crypto Validation**:
-  - If providing a Wallet Address, call 'validate_wallet_address'.
-  - Ensure Source Chain matches Address type (e.g. 0x... needs Base/Celo, not Solana).
-- **Bank Validation**:
-  - If providing Bank Details, call 'validate_withdrawal_details'.
-- **Auto-Confirm**:
-  - If ALL info is present and valid, call 'confirm_withdrawal'.
+     DO NOT set attached_symbol or attached_amount for standard transfers.
 
 INTERACTION FLOWS:
 
-[Bank Flow]
-User: "Send 20k to Opay 8060864466 from my usdt on sol"
--> Validate Bank Details.
--> Confirm Withdrawal (Bank).
-
-[Crypto Flow - Chain SPECIFIED in message]
-User: "Send 5 USDT to 0x123... base"
--> User said "base" -> chain is BASE
--> Validate Wallet Address.
--> Confirm Withdrawal (chain: BASE, currency: USDT).
-
-[Crypto Flow - Chain NOT specified]
-User: "Send 4 USDT to 0x123..."
--> Validate Wallet Address.
--> address_type: "EVM" and user did NOT say base/celo
--> Response: "Which network do you want to send to? (Base or Celo)"
-
-[Error]
-User: "Send 20k to 0x123... on Solana"
--> Error: "Solana requires a Solana address, not 0x..."
+[Amadeus Transfer]
+User: "Send 10 AMA to [Address]"
+-> Agent: Calls 'create_transaction' with EXACT parameters above (Coin, transfer, args)
+-> Tool: Returns { signing_payload: "...", blob: "..." }
+-> Agent: "Transaction ready. Please sign." (Stops)
+-> User: (Signs via UI) -> Returns Signature
+-> Agent: Calls 'submit_transaction'
+-> Tool: Returns TxHash
+-> Agent: "Success: [TxHash]"
 `;
 
 export interface AgentResponse {
-  type: "text" | "confirmation" | "error";
+  type: "text" | "confirmation" | "error" | "signature_request";
   message?: string;
   data?: any;
   updatedHistory?: any[];
@@ -110,11 +97,8 @@ export async function processUserQuery(
   }
 
   try {
-    const formattedTools = tools.map((t) => ({
-      name: t.name,
-      description: t.description,
-      input_schema: t.input_schema,
-    }));
+    // Dynamic Tool Loading
+    const tools = await MCPRegistry.getInstance().getAllTools();
 
     // Start with previous history and append the new user message
     let messages: any[] = [...previousHistory, { role: "user", content: userMessage }];
@@ -122,10 +106,10 @@ export async function processUserQuery(
     // Run the loop (max 5 turns to prevent infinite loops)
     for (let i = 0; i < 5; i++) {
       const response = await anthropic.messages.create({
-        model: "claude-3-haiku-20240307",
+        model: "claude-3-haiku-20240307", // Consider upgrading to Sonnet for complex tools if needed
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
-        tools: formattedTools,
+        tools: tools,
         messages: messages,
       });
 
@@ -146,8 +130,8 @@ export async function processUserQuery(
 
             console.log(`[AI Agent] Invoking tool: ${toolName}`, toolInput);
 
+            // 1. Handle Withdrawal Confirmation (Bank/Crypto)
             if (toolName === "confirm_withdrawal") {
-              // We are done!
               return {
                 type: "confirmation",
                 data: toolInput,
@@ -155,28 +139,54 @@ export async function processUserQuery(
               };
             }
 
-            const toolDef = tools.find(t => t.name === toolName);
-            if (toolDef) {
-              try {
-                const result = await toolDef.handler(toolInput as any);
-                toolResults.push({
-                  type: "tool_result",
-                  tool_use_id: toolId,
-                  content: JSON.stringify(result)
-                });
-              } catch (err: any) {
-                toolResults.push({
-                  type: "tool_result",
-                  tool_use_id: toolId,
-                  content: JSON.stringify({ error: err.message }),
-                  is_error: true
-                });
+            // 2. Execute Generic/MCP Tool
+            try {
+              const result = await MCPRegistry.getInstance().executeTool(toolName, toolInput);
+
+              // 3. Handle Signature Request Interception
+              // Check if result is standard MCP format with content list
+              let signingData = result;
+
+              // If result has content array, try to parse the first text block
+              if (result && result.content && Array.isArray(result.content)) {
+                const textBlock = result.content.find((c: any) => c.type === 'text');
+                if (textBlock && textBlock.text) {
+                  try {
+                    const parsed = JSON.parse(textBlock.text);
+                    if (parsed && parsed.signing_payload && parsed.blob) {
+                      signingData = parsed;
+                    }
+                  } catch (e) {
+                    // Not JSON, ignore
+                  }
+                }
               }
-            } else {
+
+              // If the tool returns a signing payload (direct or parsed), we must pause and ask user to sign.
+              if (signingData && signingData.signing_payload && signingData.blob) {
+                return {
+                  type: "signature_request",
+                  data: {
+                    toolName,
+                    payload: signingData.signing_payload,
+                    blob: signingData.blob,
+                    rawResult: result
+                  },
+                  message: "Please sign this transaction to proceed.",
+                  updatedHistory: messages
+                };
+              }
+
               toolResults.push({
                 type: "tool_result",
                 tool_use_id: toolId,
-                content: "Tool not found",
+                content: JSON.stringify(result)
+              });
+            } catch (err: any) {
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: toolId,
+                content: JSON.stringify({ error: err.message }),
                 is_error: true
               });
             }
@@ -188,7 +198,7 @@ export async function processUserQuery(
 
         // Continue loop to let Claude process tool results
       } else {
-        // Text response (asking for more info or clarifying)
+        // Text response
         const textBlock = content.find(c => c.type === "text");
         if (textBlock && textBlock.text) {
           return {

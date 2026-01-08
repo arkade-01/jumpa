@@ -4,7 +4,7 @@
  */
 
 interface AIWithdrawalState {
-  step: 'processing' | 'awaiting_bank_name' | 'awaiting_chain' | 'awaiting_currency' | 'awaiting_pin';
+  step: 'processing' | 'awaiting_bank_name' | 'awaiting_chain' | 'awaiting_currency' | 'awaiting_pin' | 'awaiting_amadeus_confirmation';
   lastUpdated: number; // For TTL
   data: {
     history?: { role: "user" | "assistant"; content: string }[]; // Conversation history
@@ -18,6 +18,11 @@ interface AIWithdrawalState {
     cryptoAmount?: number;   // Calculated crypto amount
     yaraWalletAddress?: string; // Yara payment widget wallet address
     pinAttempts?: number;    // Number of failed PIN attempts
+    // Amadeus Specific
+    transactionBlob?: string;
+    signingPayload?: string;
+    toolName?: string;
+    rawResult?: any;
   };
 }
 

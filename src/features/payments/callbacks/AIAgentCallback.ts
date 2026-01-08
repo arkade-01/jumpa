@@ -27,6 +27,9 @@ import { generateTransactionReceipt } from "@shared/utils/receiptGenerator";
 import { findYaraBankCode } from "@features/payments/utils/yaraBankCodes";
 import { processUserQuery } from "@src/ai-agent/agent.config";
 import { sendOrEdit } from "@src/shared/utils/messageHelper";
+import { signTransaction } from "@src/blockchain/amadeus/amadeusFunctions";
+import { decryptPrivateKey } from "@src/shared/utils/encryption";
+import { MCPRegistry } from "@core/mcp/MCPRegistry";
 
 /**
  * Callback Handler for detecting withdrawal intents from natural language
@@ -89,8 +92,35 @@ export class AICallbackHandler {
         history = currentState.data.history;
       }
 
+      // Fetch user info to get Amadeus address provided they have one
+      const username = ctx.from?.username || ctx.from?.first_name || "Unknown";
+      const user = await getUser(userId, username);
+
+      let systemInjection = "";
+      if (user && user.amadeusWallets && user.amadeusWallets.length > 0) {
+        const userAddress = user.amadeusWallets[0].publicKey;
+        systemInjection = `OFFICIAL SIGNER ADDRESS: ${userAddress}. Use this address for 'signer' in create_transaction.`;
+      }
+
+      // If this is a new session, inject the signer info
+      if (!history.length && systemInjection) {
+        history.push({ role: "user", content: systemInjection });
+        // Note: we add it as a fake user message or assistant "thought" so it sticks in context
+        // A better way for Anthropic is to just prepend it to the user message or as a separate user/assistant turn.
+        // Let's prepend to the actual user message for simplicity in this turn
+      }
+
       // Call the AI Agent
-      const aiResponse = await processUserQuery(userId, userMessage, history);
+      // If we have a system injection, we can pass it as part of the message if history is empty
+      // Or if history exists, relying on the fact that we should have it?
+      // Actually, let's just prepend to userMessage if it's a new request or ensure it's in context.
+
+      let finalMessage = userMessage;
+      if (systemInjection) {
+        finalMessage = `${systemInjection}\n\n${userMessage}`;
+      }
+
+      const aiResponse = await processUserQuery(userId, finalMessage, history);
 
       if (aiResponse.type === "error") {
         console.error(`[AI Withdrawal] AI Error: ${aiResponse.message}`);
@@ -132,9 +162,45 @@ export class AICallbackHandler {
         });
       }
 
+      if (aiResponse.type === "signature_request") {
+        const data = aiResponse.data;
+        await AICallbackHandler.initiateAmadeusSignatureFlow(ctx, data);
+      }
+
     } catch (error: any) {
       console.error("[AI Withdrawal] Error in handleAIQuery:", error);
     }
+  }
+
+  /**
+   * Sets up state for Amadeus Transaction Signature
+   */
+  private static async initiateAmadeusSignatureFlow(ctx: Context, data: any): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    // Store state
+    setAIWithdrawalState(userId, "awaiting_amadeus_confirmation", {
+      transactionBlob: data.blob,
+      signingPayload: data.payload,
+      toolName: data.toolName,
+      rawResult: data.rawResult,
+      pinAttempts: 0
+    });
+
+    const confirmationMessage =
+      `🔐 **Confirm Transaction**\n\n` +
+      `Click **Confirm** to approve the transaction.`;
+
+    await ctx.reply(confirmationMessage, {
+      parse_mode: "Markdown",
+      ...Markup.inlineKeyboard([
+        [
+          Markup.button.callback("❌ Reject", "ai_withdraw_cancel"),
+          Markup.button.callback("✅ Confirm", "confirm_amadeus_tx")
+        ]
+      ])
+    });
   }
 
   /**
@@ -234,6 +300,46 @@ export class AICallbackHandler {
   }
 
   /**
+   * Handle Amadeus Confirmation Button Logic
+   */
+  static async handleAmadeusConfirmation(ctx: Context): Promise<void> {
+    const userId = ctx.from?.id;
+    const username = ctx.from?.username || ctx.from?.first_name || "Unknown";
+
+    if (!userId) return;
+
+    try {
+      const state = getAIWithdrawalState(userId);
+      if (!state || state.step !== "awaiting_amadeus_confirmation") {
+        await ctx.answerCbQuery("❌ Session expired.");
+        return;
+      }
+
+      const user = await getUser(userId, username);
+      if (!user) {
+        await ctx.answerCbQuery("❌ User not found.");
+        return;
+      }
+
+      // Delete the confirmation message
+      try {
+        await ctx.deleteMessage();
+      } catch (e) {
+        // Ignore
+      }
+
+      await ctx.answerCbQuery("✅ Processing...");
+
+      // Execute directly
+      await AICallbackHandler.executeAmadeusTransaction(ctx, state.data, user);
+
+    } catch (error: any) {
+      console.error("Amadeus Confirmation Error:", error);
+      await ctx.answerCbQuery("❌ Error processing request");
+    }
+  }
+
+  /**
    * Handle PIN input and execute withdrawal
    */
   static async handlePINInput(ctx: Context): Promise<void> {
@@ -315,6 +421,131 @@ export class AICallbackHandler {
 
     // Execute withdrawal
     await AICallbackHandler.executeWithdrawal(ctx, state.data, user);
+  }
+
+  /**
+   * Execute Amadeus Transaction
+   */
+  public static async executeAmadeusTransaction(
+    ctx: Context,
+    data: any,
+    user: any
+  ): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    try {
+      await sendOrEdit(ctx, "✍️ Signing and submitting transaction...");
+
+      // 1. Get User's Amadeus Private Key
+      // Use default (first) wallet
+      if (!user.amadeusWallets || user.amadeusWallets.length === 0) {
+        throw new Error("No Amadeus wallet found for this user.");
+      }
+
+      const encryptedKey = user.amadeusWallets[0].encryptedPrivateKey;
+      const decryptedHexKey = decryptPrivateKey(encryptedKey);
+
+      // Amadeus keys are stored as Hex-encoded UTF8 strings of the Base58 key
+      // Convert back to original Base58 string
+      const privateKey = Buffer.from(decryptedHexKey, 'hex').toString('utf8');
+
+      // 2. Sign Transaction
+      const signature = signTransaction(data.signingPayload, privateKey);
+
+      // 3. Submit Transaction
+      // We use the generic executeTool from registry
+      // 'submit_transaction' params: { transaction, signature, network: 'testnet' }
+
+      // 3. Submit Transaction
+      // Default to testnet if not specified
+      const network = data.network || 'testnet';
+      console.log(`[AI Agent] Submitting transaction to ${network}...`);
+
+      const result = await MCPRegistry.getInstance().executeTool('submit_transaction', {
+        transaction: data.transactionBlob,
+        signature: signature,
+        network: network
+      });
+
+      // Verify result isn't an error object disguised as success
+      if (result && result.content && Array.isArray(result.content)) {
+        const textBlock = result.content.find((c: any) => c.type === 'text');
+        if (textBlock && textBlock.text && textBlock.text.includes('"error"')) {
+          // Treat as error UNLESS error is "ok"
+          if (!textBlock.text.includes('"error": "ok"') && !textBlock.text.includes('"error":"ok"')) {
+            console.log(`[AI Agent] Detected error in tool output: ${textBlock.text}`);
+            throw new Error(textBlock.text);
+          }
+        }
+      }
+
+      console.log("[AI Agent] Submit Result:", result);
+
+      // Check for nested error in content
+      let errorMessage = "";
+      if (result && result.content && Array.isArray(result.content)) {
+        const textBlock = result.content.find((c: any) => c.type === 'text');
+        if (textBlock && textBlock.text) {
+          const text = textBlock.text;
+          if (text.includes('"error"')) {
+            // IGNORE if error is "ok"
+            if (!text.includes('"error": "ok"') && !text.includes('"error":"ok"')) {
+              try {
+                const parsed = JSON.parse(text);
+                if (parsed.error && parsed.error !== "ok") errorMessage = parsed.error;
+              } catch (e) {
+                // Check simple substring if parsing fails
+                if (text.toLowerCase().includes("error")) errorMessage = text;
+              }
+            }
+          }
+        }
+      }
+
+      if (errorMessage) {
+        throw new Error(`Submission Error: ${errorMessage}`);
+      }
+
+      let finalHash = result.transaction_hash || result.hash;
+
+      // Attempt to extract hash from nested content if not directly available
+      if (!finalHash && result && result.content && Array.isArray(result.content)) {
+        const textBlock = result.content.find((c: any) => c.type === 'text');
+        if (textBlock && textBlock.text) {
+          try {
+            const parsed = JSON.parse(textBlock.text);
+            if (parsed.tx_hash) finalHash = parsed.tx_hash;
+            else if (parsed.hash) finalHash = parsed.hash;
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+
+      // Fallback
+      if (!finalHash) finalHash = JSON.stringify(result);
+
+      const explorerBase = network === 'mainnet'
+        ? 'https://explorer.ama.one/network/tx'
+        : 'https://testnet.explorer.ama.one/network/tx';
+
+      const explorerLink = `${explorerBase}/${finalHash}`;
+
+      const successMsg = `✅ **Transaction Successful!**\n\n` +
+        `Hash: \`${finalHash}\`\n\n` +
+        `Network: Amadeus ${(network || 'testnet').charAt(0).toUpperCase() + (network || 'testnet').slice(1)}\n\n` +
+        `[View on Explorer](${explorerLink})`;
+
+      await sendOrEdit(ctx, successMsg, { parse_mode: "Markdown" });
+
+      clearAIWithdrawalState(userId);
+
+    } catch (error: any) {
+      console.error("[AI Agent] Amadeus Execution Error:", error);
+      await ctx.reply(`❌ Transaction Failed: ${error.message}`);
+      clearAIWithdrawalState(userId);
+    }
   }
 
   /**

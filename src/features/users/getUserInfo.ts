@@ -12,7 +12,8 @@ async function getUser(telegram_id: Number, username: string) {
       const amadeusWallet = await generateAmadeusWallet();
       user.amadeusWallets.push({
         publicKey: amadeusWallet.pubKey,
-        encryptedPrivateKey: encryptPrivateKey(amadeusWallet.privKey),
+        // Convert Base58 string to Hex string for storage
+        encryptedPrivateKey: encryptPrivateKey(Buffer.from(amadeusWallet.privKey, 'utf8').toString('hex')),
         balance: amadeusWallet.balance,
         last_updated_balance: new Date(),
       });

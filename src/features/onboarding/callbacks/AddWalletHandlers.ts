@@ -605,7 +605,9 @@ Paste your Amadeus private key (starting with 'seed...').
       }
 
       // Encrypt private key
-      const encryptedPrivateKey = encryptPrivateKey(privateKeyInputClean);
+      // Convert Base58 string to Hex string for storage compatibility
+      const hexKey = Buffer.from(privateKeyInputClean, 'utf8').toString('hex');
+      const encryptedPrivateKey = encryptPrivateKey(hexKey);
 
       // Add wallet to user
       await addAmadeusWalletToUser(
