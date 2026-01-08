@@ -164,7 +164,8 @@ export class AICallbackHandler {
 
       if (aiResponse.type === "signature_request") {
         const data = aiResponse.data;
-        await AICallbackHandler.initiateAmadeusSignatureFlow(ctx, data);
+        // Pass the updated history which now contains the tool result
+        await AICallbackHandler.initiateAmadeusSignatureFlow(ctx, data, aiResponse.updatedHistory);
       }
 
     } catch (error: any) {
@@ -175,16 +176,18 @@ export class AICallbackHandler {
   /**
    * Sets up state for Amadeus Transaction Signature
    */
-  private static async initiateAmadeusSignatureFlow(ctx: Context, data: any): Promise<void> {
+  private static async initiateAmadeusSignatureFlow(ctx: Context, data: any, history: any[] = []): Promise<void> {
     const userId = ctx.from?.id;
     if (!userId) return;
 
     // Store state
+    // Store state with history
     setAIWithdrawalState(userId, "awaiting_amadeus_confirmation", {
       transactionBlob: data.blob,
       signingPayload: data.payload,
       toolName: data.toolName,
       rawResult: data.rawResult,
+      history: history, // Persist history
       pinAttempts: 0
     });
 
@@ -435,7 +438,7 @@ export class AICallbackHandler {
     if (!userId) return;
 
     try {
-      await sendOrEdit(ctx, "✍️ Signing and submitting transaction...");
+      await ctx.sendChatAction("typing");
 
       // 1. Get User's Amadeus Private Key
       // Use default (first) wallet
@@ -457,93 +460,38 @@ export class AICallbackHandler {
       // We use the generic executeTool from registry
       // 'submit_transaction' params: { transaction, signature, network: 'testnet' }
 
-      // 3. Submit Transaction
-      // Default to testnet if not specified
-      const network = data.network || 'testnet';
-      console.log(`[AI Agent] Submitting transaction to ${network}...`);
+      // 3. AI-Driven Submission
+      // The AI (via processUserQuery loop) will:
+      // a) Call 'submit_transaction' tool
+      // b) Parse the result
+      // c) Generate the final response
 
-      const result = await MCPRegistry.getInstance().executeTool('submit_transaction', {
-        transaction: data.transactionBlob,
-        signature: signature,
-        network: network
-      });
+      const history = data.history || [];
+      const userFollowUp = `Transaction signed. 
+Signature: ${signature}
+Transaction Blob: ${data.transactionBlob}
+Please submit the transaction now.`;
 
-      // Verify result isn't an error object disguised as success
-      if (result && result.content && Array.isArray(result.content)) {
-        const textBlock = result.content.find((c: any) => c.type === 'text');
-        if (textBlock && textBlock.text && textBlock.text.includes('"error"')) {
-          // Treat as error UNLESS error is "ok"
-          if (!textBlock.text.includes('"error": "ok"') && !textBlock.text.includes('"error":"ok"')) {
-            console.log(`[AI Agent] Detected error in tool output: ${textBlock.text}`);
-            throw new Error(textBlock.text);
-          }
-        }
+
+      // await sendOrEdit(ctx, "🔄 Submitting transaction via Agent...");
+
+      const aiResponse = await processUserQuery(userId, userFollowUp, history);
+
+      if (aiResponse.type === 'text') {
+        const responseText = aiResponse.message || "Transaction processed.";
+        await sendOrEdit(ctx, responseText, { parse_mode: "Markdown" });
+      } else if (aiResponse.type === 'error') {
+        throw new Error(aiResponse.message);
+      } else {
+        console.warn("[AI Agent] Unexpected response type during submission:", aiResponse.type);
+        await sendOrEdit(ctx, "⚠️ Transaction processed, but response was unexpected.");
       }
-
-      console.log("[AI Agent] Submit Result:", result);
-
-      // Check for nested error in content
-      let errorMessage = "";
-      if (result && result.content && Array.isArray(result.content)) {
-        const textBlock = result.content.find((c: any) => c.type === 'text');
-        if (textBlock && textBlock.text) {
-          const text = textBlock.text;
-          if (text.includes('"error"')) {
-            // IGNORE if error is "ok"
-            if (!text.includes('"error": "ok"') && !text.includes('"error":"ok"')) {
-              try {
-                const parsed = JSON.parse(text);
-                if (parsed.error && parsed.error !== "ok") errorMessage = parsed.error;
-              } catch (e) {
-                // Check simple substring if parsing fails
-                if (text.toLowerCase().includes("error")) errorMessage = text;
-              }
-            }
-          }
-        }
-      }
-
-      if (errorMessage) {
-        throw new Error(`Submission Error: ${errorMessage}`);
-      }
-
-      let finalHash = result.transaction_hash || result.hash;
-
-      // Attempt to extract hash from nested content if not directly available
-      if (!finalHash && result && result.content && Array.isArray(result.content)) {
-        const textBlock = result.content.find((c: any) => c.type === 'text');
-        if (textBlock && textBlock.text) {
-          try {
-            const parsed = JSON.parse(textBlock.text);
-            if (parsed.tx_hash) finalHash = parsed.tx_hash;
-            else if (parsed.hash) finalHash = parsed.hash;
-          } catch (e) {
-            // ignore
-          }
-        }
-      }
-
-      // Fallback
-      if (!finalHash) finalHash = JSON.stringify(result);
-
-      const explorerBase = network === 'mainnet'
-        ? 'https://explorer.ama.one/network/tx'
-        : 'https://testnet.explorer.ama.one/network/tx';
-
-      const explorerLink = `${explorerBase}/${finalHash}`;
-
-      const successMsg = `✅ **Transaction Successful!**\n\n` +
-        `Hash: \`${finalHash}\`\n\n` +
-        `Network: Amadeus ${(network || 'testnet').charAt(0).toUpperCase() + (network || 'testnet').slice(1)}\n\n` +
-        `[View on Explorer](${explorerLink})`;
-
-      await sendOrEdit(ctx, successMsg, { parse_mode: "Markdown" });
 
       clearAIWithdrawalState(userId);
 
     } catch (error: any) {
       console.error("[AI Agent] Amadeus Execution Error:", error);
-      await ctx.reply(`❌ Transaction Failed: ${error.message}`);
+      await ctx.reply(`❌ Transaction Failed: ${error.message} `);
       clearAIWithdrawalState(userId);
     }
   }
@@ -566,7 +514,7 @@ export class AICallbackHandler {
       // FLOW A: DIRECT CRYPTO TRANSFER (ON-CHAIN)
       // ==========================================
       if (data.wallet_address) {
-        console.log(`[AI Withdrawal] Executing Direct Crypto Transfer to ${data.wallet_address}`);
+        console.log(`[AI Withdrawal] Executing Direct Crypto Transfer to ${data.wallet_address} `);
         recipientAddress = data.wallet_address;
 
         // No Yara Widget needed. Direct blockchain transfer.
@@ -587,10 +535,10 @@ export class AICallbackHandler {
         const yaraBankCode = findYaraBankCode(bankName);
         if (!yaraBankCode) {
           console.error(
-            `[AI Withdrawal] Yara bank code not found for: ${bankName}`
+            `[AI Withdrawal] Yara bank code not found for: ${bankName} `
           );
           await ctx.reply(
-            `❌ Bank "${bankName}" is not supported for withdrawals. Please contact support.`
+            `❌ Bank "${bankName}" is not supported for withdrawals.Please contact support.`
           );
           clearAIWithdrawalState(userId);
           return;
@@ -649,7 +597,7 @@ export class AICallbackHandler {
         if (!getPaymentWidget.ok) {
           const errorText = await getPaymentWidget.text();
           throw new Error(
-            `Payment widget API error: ${getPaymentWidget.status} - ${errorText}`
+            `Payment widget API error: ${getPaymentWidget.status} - ${errorText} `
           );
         }
 
@@ -657,7 +605,7 @@ export class AICallbackHandler {
         console.log("[AI Withdrawal] Payment widget created:", paymentWidget);
 
         if (paymentWidget.error) {
-          await ctx.reply(`❌ Withdrawal failed: ${paymentWidget.error}`);
+          await ctx.reply(`❌ Withdrawal failed: ${paymentWidget.error} `);
           clearAIWithdrawalState(userId);
           return;
         }
@@ -669,7 +617,7 @@ export class AICallbackHandler {
         // This is the address we send TO
         recipientAddress = data.chain === "SOLANA" ? solAddress : ethAddress;
 
-        console.log(`[AI Withdrawal] Yara requires funding at: ${recipientAddress}`);
+        console.log(`[AI Withdrawal] Yara requires funding at: ${recipientAddress} `);
 
         // Save Widget Transaction to DB
         // ... (Database logic can remain similar, focusing on tracking)
@@ -684,7 +632,7 @@ export class AICallbackHandler {
       }
 
       console.log(
-        `[AI Withdrawal] Recipient address (${data.chain}): ${recipientAddress} | Amount: ${data.cryptoAmount}`
+        `[AI Withdrawal] Recipient address(${data.chain}): ${recipientAddress} | Amount: ${data.cryptoAmount} `
       );
 
       // Execute withdrawal based on chain and currency using pure transaction utilities
@@ -750,7 +698,7 @@ export class AICallbackHandler {
         let successMsg = "";
 
         if (data.wallet_address) {
-          successMsg = `✅ **Withdrawal Successful!**\n\n` +
+          successMsg = `✅ ** Withdrawal Successful! **\n\n` +
             `Sent: \`${depositAmount} ${data.currency}\`\n` +
             `To: \`${data.wallet_address}\`\n` +
             `Chain: ${data.chain}`;

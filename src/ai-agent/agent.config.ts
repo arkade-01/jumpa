@@ -62,8 +62,10 @@ User: "Send 10 AMA to [Address]"
 -> Agent: "Transaction ready. Please sign." (Stops)
 -> User: (Signs via UI) -> Returns Signature
 -> Agent: Calls 'submit_transaction'
+-> Agent: Calls 'submit_transaction'
 -> Tool: Returns TxHash
--> Agent: "Success: [TxHash]"
+-> Agent: "✅ Transaction Successful: \n\n [TxHash] \n\n [View in Explorer](https://testnet.explorer.ama.one/network/tx/[TxHash])"
+   (ALWAYS include the explorer link for Amadeus transactions. Default to testnet explorer unless mainnet specified).
 `;
 
 export interface AgentResponse {
@@ -84,9 +86,9 @@ export async function processUserQuery(
   }
 
   // Input validation
-  const MAX_MESSAGE_LENGTH = 300;
+  const MAX_MESSAGE_LENGTH = 10000; //to accommodate long messages from tool responses
   if (userMessage.length > MAX_MESSAGE_LENGTH) {
-    return { type: "error", message: "Message too long. Please keep it under 300 characters." };
+    return { type: "error", message: "Message too long. Please keep it under 10000 characters." };
   }
 
   const BLOCKED_PATTERNS = [/\<script\>/i, /javascript:/i];
@@ -164,6 +166,16 @@ export async function processUserQuery(
 
               // If the tool returns a signing payload (direct or parsed), we must pause and ask user to sign.
               if (signingData && signingData.signing_payload && signingData.blob) {
+                // IMPORTANT: append the tool result to history so the conversation is valid (Tool Use -> Tool Result)
+                messages.push({
+                  role: "user",
+                  content: [{
+                    type: "tool_result",
+                    tool_use_id: toolId,
+                    content: JSON.stringify(result)
+                  }]
+                });
+
                 return {
                   type: "signature_request",
                   data: {
