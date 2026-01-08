@@ -108,7 +108,7 @@ export async function processUserQuery(
     // Run the loop (max 5 turns to prevent infinite loops)
     for (let i = 0; i < 5; i++) {
       const response = await anthropic.messages.create({
-        model: "claude-3-haiku-20240307", // Consider upgrading to Sonnet for complex tools if needed
+        model: "claude-sonnet-4-5-20250929",
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
         tools: tools,
@@ -117,6 +117,8 @@ export async function processUserQuery(
 
       const stopReason = response.stop_reason;
       const content = response.content;
+
+      console.log(`[AI Agent] Turn ${i + 1} Response: StopReason=${stopReason}`, JSON.stringify(content));
 
       // Append assistant's response to history
       messages.push({ role: "assistant", content: content });

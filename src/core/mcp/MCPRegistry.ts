@@ -120,4 +120,33 @@ export class MCPRegistry {
 
     throw new Error(`Tool '${toolName}' not found.`);
   }
+
+  /**
+   * Get a list of dynamic keywords derived from available tools.
+   * This allows the agent to "listen" for relevant topics.
+   */
+  async getDynamicKeywords(): Promise<string[]> {
+    // Ensure tools are loaded
+    await this.getAllTools();
+
+    const vocabulary = new Set<string>();
+    const stopWords = new Set(["get", "create", "list", "update", "delete", "a", "an", "the", "to", "for"]);
+
+    this.cachedTools.forEach(tool => {
+      // Split tool name by underscore or camelCase
+      const parts = tool.name.split(/_|(?=[A-Z])/).map(s => s.toLowerCase());
+
+      parts.forEach(part => {
+        if (part.length > 2 && !stopWords.has(part)) {
+          vocabulary.add(part);
+        }
+      });
+    });
+
+    // Add standard banking keywords that might not be in tool names
+    const hardcodedDefaults = ["send", "withdraw", "transfer", "pay", "buy", "balance", "deposit"];
+    hardcodedDefaults.forEach(w => vocabulary.add(w));
+
+    return Array.from(vocabulary);
+  }
 }

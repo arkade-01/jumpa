@@ -67,8 +67,8 @@ export class AICallbackHandler {
         return;
       }
 
-      // Basic heuristic to check if this MIGHT be a withdrawal request before calling expensive AI
-      const keywords = ["send", "withdraw", "transfer", "pay", "deposit", "airdrop"];
+      // Dynamic Intent Check: Check if message matches any tool keyword
+      const keywords = await MCPRegistry.getInstance().getDynamicKeywords();
       const hasWithdrawalKeyword = keywords.some(k => userMessage.toLowerCase().includes(k));
 
       // Retrieve existing state to check if we are in an active conversation
@@ -123,7 +123,7 @@ export class AICallbackHandler {
       const aiResponse = await processUserQuery(userId, finalMessage, history);
 
       if (aiResponse.type === "error") {
-        console.error(`[AI Withdrawal] AI Error: ${aiResponse.message}`);
+        console.error(`[AI Withdrawal] AI Error: ${aiResponse.message} ${aiResponse?.data} ${aiResponse?.type}`);
         // Optional: reply to user about error, or just ignore if unrelated
         return;
       }
