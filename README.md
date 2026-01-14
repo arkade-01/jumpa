@@ -31,9 +31,117 @@ Jumpa is a Telegram-based collaborative trading bot that enables users to create
 
 - `@solana/web3.js` - Solana blockchain interaction
 - `@coral-xyz/anchor` - Solana smart contract framework
+- `@amadeus-protocol/sdk` - Amadeus blockchain SDK
+- `@modelcontextprotocol/sdk` - Model Context Protocol client
+- `@anthropic-ai/sdk` - Claude AI agent
 - `telegraf` - Telegram bot development
 - `ethers` - Ethereum wallet & transactions
 - `mongoose` - MongoDB object modeling
+
+## 🔗 How Amadeus Is Used
+
+Jumpa integrates with the **Amadeus Protocol** to enable AI-agent blockchain operations and provide users with secure, verifiable on-chain identity. This integration fulfills multiple aspects of decentralized agent infrastructure.
+
+### 1. MCP (Model Context Protocol) Integration
+
+Jumpa connects to the Amadeus MCP server at `https://mcp.ama.one` to provide the AI agent with real-time blockchain capabilities:
+
+- **Dynamic Tool Loading**: The [MCPRegistry](src/core/mcp/MCPRegistry.ts) dynamically fetches available tools from the Amadeus MCP server, allowing the AI to execute blockchain operations like creating transactions, querying balances, and claiming testnet tokens.
+- **Tool Execution**: When users request blockchain actions in natural language, the AI agent automatically selects and invokes the appropriate MCP tools.
+- **Configuration**: See [mcp.config.ts](src/core/config/mcp.config.ts) for MCP server configuration.
+
+**Implementation Files:**
+- [MCPRegistry.ts](src/core/mcp/MCPRegistry.ts) - MCP client registry and tool orchestration
+- [agent.config.ts](src/ai-agent/agent.config.ts) - AI agent system prompts and MCP tool integration
+
+### 2. Agent Identity & Memory
+
+Each user in Jumpa has a persistent **Amadeus wallet** that serves as their on-chain identity:
+
+- **Database Schema**: Amadeus wallets are stored in MongoDB with encrypted private keys. See the `amadeusWallets` field in the [User model](src/core/database/models/user.ts#L85-L102).
+- **Automatic Wallet Creation**: When a user registers, an Amadeus wallet is automatically generated and associated with their account.
+- **Multi-Wallet Support**: Users can manage up to 3 Amadeus wallets per account.
+- **Session Persistence**: The AI agent remembers the user's Amadeus address across conversations, enabling continuous identity tracking.
+
+**Agent Identity Injection:**
+```typescript
+// The AI agent is provided with the user's Amadeus address
+const userAddress = user.amadeusWallets[0].publicKey;
+systemInjection = `OFFICIAL SIGNER ADDRESS: ${userAddress}`;
+```
+
+### 3. Wallet Management & BLS12-381 Cryptography
+
+Amadeus uses **BLS12-381 signatures** for transaction signing:
+
+- **Keypair Generation**: Wallets are generated using the Amadeus SDK's `generateKeypair()` function.
+- **Signature Creation**: Transactions are signed using the [signTransaction](src/blockchain/amadeus/amadeusFunctions.ts#L53-L63) function, which implements BLS12-381 long signatures with domain separation.
+- **Private Key Encryption**: All private keys are encrypted using AES-256 before storage.
+- **Key Derivation**: The SDK derives secret keys from Base58-encoded seeds using `deriveSkAndSeed64FromBase58Seed()`.
+
+**Implementation Files:**
+- [amadeusFunctions.ts](src/blockchain/amadeus/amadeusFunctions.ts) - Wallet generation, balance queries, and transaction signing
+
+### 4. AI-Driven Transaction Flow
+
+The AI agent orchestrates a **two-step transaction process** for Amadeus blockchain operations:
+
+**Step 1: Transaction Creation**
+- User requests an action (e.g., "Send 10 AMA to [address]")
+- AI agent calls the `create_transaction` MCP tool
+- Amadeus MCP server returns `signing_payload` and `blob`
+- AI pauses and requests user confirmation
+
+**Step 2: Signature & Submission**
+- User confirms transaction
+- Application signs the `signing_payload` using BLS12-381
+- AI agent calls `submit_transaction` with the signature and blob
+- Transaction is submitted to the Amadeus network
+- AI returns the transaction hash with an explorer link
+
+**Implementation Files:**
+- [AIAgentCallback.ts](src/features/payments/callbacks/AIAgentCallback.ts) - Handles AI agent transaction flow, signature confirmation, and submission
+- [agent.config.ts](src/ai-agent/agent.config.ts#L31-L69) - System prompts defining the transaction creation protocol
+
+**Example Transaction Parameters:**
+```typescript
+{
+  signer: "user_amadeus_address",
+  contract: "Coin",
+  function: "transfer",
+  args: [
+    { b58: "RECIPIENT_ADDRESS" },
+    "10000000000",  // 10 AMA (1 AMA = 1,000,000,000 base units)
+    "AMA"
+  ]
+}
+```
+
+### 5. State Proofs & Verification
+
+- **On-Chain Verification**: All transactions are recorded on the Amadeus blockchain with cryptographic proofs.
+- **Explorer Integration**: Transaction hashes link to the Amadeus testnet explorer at `https://testnet.explorer.ama.one/network/tx/[TxHash]` and mainnet explorer at `https://explorer.ama.one/network/tx/[TxHash]`.
+- **Balance Queries**: The `getAmadeusBalance()` function queries on-chain wallet state directly from Amadeus nodes.
+
+### 6. WASM Runtime (SDK Integration)
+
+The Amadeus TypeScript SDK (`@amadeus-protocol/sdk`) serves as a high-level wrapper over the Amadeus WASM runtime, providing:
+- Keypair generation and key derivation
+- Balance queries from Amadeus nodes
+- Transaction utilities and serialization
+- Base58 encoding/decoding for addresses
+
+**SDK Version**: `^1.0.2` (see [package.json](package.json#L27))
+
+### 7. Future Roadmap
+
+The following Amadeus features are planned for future integration:
+
+- **uPoW (Useful Proof of Work)**: Integrate Amadeus's uPoW consensus mechanism for agent participation in network security
+- **Oracle Streams**: Connect to Amadeus oracle networks for real-time off-chain data feeds
+- **Swarm Coordination**: Enable multi-agent coordination and consensus using Amadeus's swarm protocols
+
+---
 
 ## 📁 Project Structure
 
