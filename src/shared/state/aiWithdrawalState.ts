@@ -4,12 +4,13 @@
  */
 
 interface AIWithdrawalState {
-  step: 'processing' | 'awaiting_bank_name' | 'awaiting_chain' | 'awaiting_currency' | 'awaiting_pin' | 'awaiting_amadeus_confirmation';
+  step: 'processing' | 'awaiting_bank_name' | 'awaiting_chain' | 'awaiting_currency' | 'awaiting_pin' | 'awaiting_bulk_pin' | 'awaiting_amadeus_confirmation';
   lastUpdated: number; // For TTL
   data: {
     history?: { role: "user" | "assistant"; content: string }[]; // Conversation history
     amount?: number;          // NGN amount
     recipient?: string;       // Bank account number
+    recipients?: any[];       // For bulk transfers
     bankName?: string;       // Bank name (optional initially)
     bankCode?: string;       // Bank code from lookup
     accountName?: string;    // Validated account name from Paystack

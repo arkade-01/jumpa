@@ -175,4 +175,64 @@ export const tools = [
       };
     },
   },
+  {
+    name: "confirm_bulk_withdrawal",
+    description: "Call this tool when user wants to send to MULTIPLE recipients (2-5). Each recipient can have different amounts. Use for EITHER bulk bank transfers OR bulk on-chain transfers.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        recipients: {
+          type: "array",
+          description: "Array of recipients (minimum 2, maximum 5)",
+          items: {
+            type: "object",
+            properties: {
+              amount: { type: "number", description: "Amount for this recipient" },
+              amount_currency: { type: "string", description: "'NGN' or crypto ticker" },
+              // Bank transfer fields
+              account_number: { type: "string", description: "Bank account number (for bank transfers)" },
+              bank_name: { type: "string", description: "Bank name (for bank transfers)" },
+              account_name: { type: "string", description: "Validated account name (for bank transfers)" },
+              // Crypto transfer fields
+              wallet_address: { type: "string", description: "Destination wallet (for crypto transfers)" },
+            },
+            required: ["amount", "amount_currency"]
+          },
+          minItems: 2,
+          maxItems: 5
+        },
+        // Common for all transfers
+        chain: { type: "string", enum: ["SOLANA", "BASE", "CELO"], description: "Source chain for all transfers" },
+        currency: { type: "string", enum: ["SOL", "USDC", "USDT", "ETH", "CELO"], description: "Source currency for all transfers" },
+      },
+      required: ["recipients", "chain", "currency"],
+    },
+    handler: async (args: any) => {
+      // Validate recipient count
+      if (!args.recipients || args.recipients.length < 2) {
+        throw new Error("Bulk transfer requires at least 2 recipients.");
+      }
+      if (args.recipients.length > 5) {
+        throw new Error("Maximum 5 recipients allowed per bulk transfer.");
+      }
+
+      // Validate each recipient has proper destination
+      for (const recipient of args.recipients) {
+        if (!recipient.wallet_address && (!recipient.account_number || !recipient.bank_name)) {
+          throw new Error("Each recipient must have either wallet_address OR (account_number + bank_name).");
+        }
+      }
+
+      // Validate supported currency
+      const SUPPORTED_CURRENCIES = ["SOL", "USDC", "USDT", "ETH", "CELO"];
+      if (!SUPPORTED_CURRENCIES.includes(args.currency)) {
+        throw new Error(`Invalid currency '${args.currency}'. Supported: ${SUPPORTED_CURRENCIES.join(", ")}.`);
+      }
+
+      return {
+        status: "bulk_confirmed",
+        ...args
+      };
+    },
+  },
 ];

@@ -5,12 +5,12 @@ import { Context } from "telegraf";
 import getUser from '@features/users/getUserInfo';
 import { decryptPrivateKey } from '@shared/utils/encryption';
 import { config } from '@core/config/environment';
-import Trade from "@core/database/models/Trade";
+import Trade, { ITrade } from "@core/database/models/Trade";
 import { getOrderState } from "@shared/state/orderState";
 
 const connection = new Connection(config.solMainnet, 'confirmed');
 
-export async function executeSellOrder(ctx: Context, transactionBase64: string, requestId: string) {
+export async function executeBuyOrder(ctx: Context, transactionBase64: string, requestId: string) {
   const telegramId = ctx.from?.id;
   const username = ctx.from?.username || ctx.from?.first_name || "Unknown";
 
@@ -50,22 +50,23 @@ export async function executeSellOrder(ctx: Context, transactionBase64: string, 
     ).json();
 
     if (executeResponse.signature) {
-      console.log('Sell Order executed:', JSON.stringify(executeResponse, null, 2));
+      console.log('Swap successful:', JSON.stringify(executeResponse, null, 2));
       console.log(`https://solscan.io/tx/${executeResponse.signature}`);
 
       // Retrieve order state to get all trade details
       const orderState = getOrderState(telegramId);
 
       if (orderState) {
-        console.log("orderState (SELL)", orderState);
+        console.log("orderState", orderState)
+        console.log("orderState", orderState)
         try {
           // Convert to human-readable amounts
-          const actualSolReceived = parseInt(executeResponse.totalOutputAmount || executeResponse.outputAmountResult);
-          const tokenAmountHuman = orderState.tokenAmount / Math.pow(10, orderState.decimals);
-          const solReceivedHuman = actualSolReceived / LAMPORTS_PER_SOL;
+          const actualTokenAmount = parseInt(executeResponse.totalOutputAmount || executeResponse.outputAmountResult);
+          const tokenAmountHuman = actualTokenAmount / Math.pow(10, orderState.decimals);
+          const amountNativeSol = orderState.amountNative / LAMPORTS_PER_SOL;
 
           // Calculate correct prices (SOL per token, USD per token)
-          const priceNative = solReceivedHuman / tokenAmountHuman;
+          const priceNative = amountNativeSol / tokenAmountHuman;
           const priceUsd = orderState.amountUsd / tokenAmountHuman;
 
           // Calculate fees with fallbacks to prevent NaN
@@ -78,9 +79,9 @@ export async function executeSellOrder(ctx: Context, transactionBase64: string, 
             feeUsd = (feeNativeValue / orderState.amountNative) * orderState.amountUsd;
           }
 
-          console.log('💾 Saving SELL trade:', {
+          console.log('💾 Saving trade:', {
             tokenAmountHuman,
-            solReceivedHuman,
+            amountNativeSol,
             priceNative,
             priceUsd,
             feeNative: feeNativeSol,
@@ -91,13 +92,13 @@ export async function executeSellOrder(ctx: Context, transactionBase64: string, 
           // Save trade to database
           await Trade.create({
             telegram_id: telegramId,
-            type: "SELL",
+            type: "BUY",
             chain: "solana",
             tokenAddress: orderState.tokenAddress,
             symbol: orderState.symbol,
-            amountNative: solReceivedHuman, // SOL received
+            amountNative: amountNativeSol,
             amountUsd: orderState.amountUsd,
-            tokenAmount: tokenAmountHuman, // tokens sold
+            tokenAmount: tokenAmountHuman,
             priceNative,
             priceUsd,
             slippage_used: orderState.slippageBps,
@@ -109,15 +110,14 @@ export async function executeSellOrder(ctx: Context, transactionBase64: string, 
             isGroupTrade: false,
           });
 
-          console.log(`✅ SELL Trade saved to database for user ${telegramId}`);
+          console.log(`✅ Trade saved to database for user ${telegramId}`);
         } catch (dbError) {
-          console.error('❌ Failed to save SELL trade to database:', dbError);
+          console.error('❌ Failed to save trade to database:', dbError);
           // Don't fail the transaction if DB save fails
         }
       } else {
-        console.warn('⚠️ OrderState not found, SELL trade not saved to database');
+        console.warn('⚠️ OrderState not found, trade not saved to database');
       }
-
 
       return {
         success: true,
@@ -139,3 +139,16 @@ export async function executeSellOrder(ctx: Context, transactionBase64: string, 
     };
   }
 }
+
+//sample data returned if swap was successful
+
+//Swap successful: {
+// "status": "Success",
+//   "signature": "1MFwghde1TB1jPz2wYSExvun2KmxpPyBkaCJJb7PUsxAFpqLG6WFboVSy92KCfD9cie2yHoWNn628GGyBexZWbr",
+//     "slot": "375472764",
+//       "code": 0,
+//         "totalInputAmount": "1000000",
+//           "totalOutputAmount": "191794",
+//             "inputAmountResult": "999800",
+//               "outputAmountResult": "191794"
+// }

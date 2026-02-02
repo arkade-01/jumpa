@@ -26,7 +26,6 @@ export class ProfileHandlers {
         );
         return;
       }
-
       // Check if user has a solana wallet
       const hasSolanaWallet =
         user.solanaWallets &&

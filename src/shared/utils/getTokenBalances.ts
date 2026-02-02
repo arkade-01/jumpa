@@ -2,11 +2,11 @@ import { config } from "@core/config/environment";
 import User from "@core/database/models/user";
 
 // Use Alchemy RPC endpoint (fallback to solMainnet if not set)
-const RPC_ENDPOINT = config.alchemyMainnetRpc;
+const RPC_ENDPOINT = config.alchemyMainnetRpc || config.solMainnet;
 
 // Token mint addresses on Solana mainnet
-const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const USDT_MINT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB';
+const USDC_MINT = config.usdcAddress;
+const USDT_MINT = config.usdtAddress;
 
 // Cache duration in milliseconds (0.5 minutes)
 const CACHE_DURATION = 0.5 * 60 * 1000;
@@ -18,7 +18,7 @@ const CACHE_DURATION = 0.5 * 60 * 1000;
  * @returns Token balance or 0 if not found
  */
 async function fetchTokenBalanceViaHTTP(walletAddress: string, mintAddress: string): Promise<number> {
-  console.log("fetchTokenBalanceViaHTTP gettokenbalance called")
+  console.log("fetchTokenBalanceViaHTTP gettokenbalance.ts")
   try {
     const response = await fetch(RPC_ENDPOINT, {
       method: 'POST',
@@ -64,6 +64,43 @@ async function fetchTokenBalanceViaHTTP(walletAddress: string, mintAddress: stri
 }
 
 /**
+ * Fetch SOL native balance via HTTP JSON-RPC
+ * @param walletAddress - The Solana wallet address
+ * @returns SOL balance string (in Lamports) or 0
+ */
+async function fetchSolBalanceViaHTTP(walletAddress: string): Promise<number> {
+  try {
+    const response = await fetch(RPC_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getBalance",
+        params: [walletAddress],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.error) {
+      throw new Error(`RPC error: ${data.error.message}`);
+    }
+
+    // Result is in lamports
+    const lamports = data.result?.value || 0;
+    return lamports / 1_000_000_000; // Convert to SOL
+  } catch (error) {
+    console.error(`Error fetching SOL balance for ${walletAddress}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Get USDC balance for a Solana wallet address (internal - no caching)
  * @param walletAddress - The Solana wallet address
  * @returns USDC balance as a number
@@ -91,6 +128,7 @@ export async function getAllTokenBalances(
   walletAddress: string,
   forceRefresh: boolean = false
 ): Promise<{
+  sol: number;
   usdc: number;
   usdt: number;
 }> {
@@ -102,7 +140,7 @@ export async function getAllTokenBalances(
 
     if (!user) {
       console.warn(`User not found for wallet address: ${walletAddress}`);
-      return { usdc: 0, usdt: 0 };
+      return { sol: 0, usdc: 0, usdt: 0 };
     }
 
     // Find the specific wallet
@@ -110,7 +148,7 @@ export async function getAllTokenBalances(
 
     if (walletIndex === -1) {
       console.warn(`Wallet not found in user's wallets: ${walletAddress}`);
-      return { usdc: 0, usdt: 0 };
+      return { sol: 0, usdc: 0, usdt: 0 };
     }
 
     const wallet = user.solanaWallets[walletIndex];
@@ -138,6 +176,7 @@ export async function getAllTokenBalances(
       }
 
       return {
+        sol: wallet.balance || 0,
         usdc: wallet.usdcBalance || 0,
         usdt: wallet.usdtBalance || 0
       };
@@ -145,8 +184,8 @@ export async function getAllTokenBalances(
 
     // Never fetched before -> Must wait for fetch
     console.log(`No cached Solana data found. Fetching fresh token balances for ${walletAddress}...`);
-    const [usdc, usdt] = await refreshTokenBalances(walletAddress, walletIndex);
-    return { usdc, usdt };
+    const [sol, usdc, usdt] = await refreshTokenBalances(walletAddress, walletIndex);
+    return { sol, usdc, usdt };
   } catch (error) {
     console.error('Error fetching token balances:', error);
 
@@ -161,6 +200,7 @@ export async function getAllTokenBalances(
         if (wallet) {
           console.log(`Returning cached values after fetch error for ${walletAddress}`);
           return {
+            sol: wallet.balance || 0,
             usdc: wallet.usdcBalance || 0,
             usdt: wallet.usdtBalance || 0
           };
@@ -170,34 +210,40 @@ export async function getAllTokenBalances(
       console.error('Error retrieving cached token balances:', dbError);
     }
 
-    return { usdc: 0, usdt: 0 };
+    return { sol: 0, usdc: 0, usdt: 0 };
   }
 }
 
 /**
  * Update token balances in database and return values
  */
-async function refreshTokenBalances(walletAddress: string, walletIndex: number): Promise<[number, number]> {
-  const [usdc, usdt] = await Promise.all([
+async function refreshTokenBalances(
+  walletAddress: string,
+  walletIndex: number
+): Promise<[number, number, number]> {
+  const [sol, usdc, usdt] = await Promise.all([
+    fetchSolBalanceViaHTTP(walletAddress),
     fetchUSDCBalance(walletAddress),
-    fetchUSDTBalance(walletAddress)
+    fetchUSDTBalance(walletAddress),
   ]);
 
   // Update DB
   await User.findOneAndUpdate(
-    { 'solanaWallets.address': walletAddress },
+    { "solanaWallets.address": walletAddress },
     {
       $set: {
+        [`solanaWallets.${walletIndex}.balance`]: sol,
+        [`solanaWallets.${walletIndex}.last_updated_balance`]: new Date(),
         [`solanaWallets.${walletIndex}.usdcBalance`]: usdc,
         [`solanaWallets.${walletIndex}.usdtBalance`]: usdt,
-        [`solanaWallets.${walletIndex}.last_updated_token_balance`]: new Date()
-      }
+        [`solanaWallets.${walletIndex}.last_updated_token_balance`]: new Date(),
+      },
     },
     { new: true }
   ).exec();
 
-  console.log(`Solana balances synced for ${walletAddress}`);
-  return [usdc, usdt];
+  console.log(`Solana balances (SOL, USDC, USDT) synced for ${walletAddress}`);
+  return [sol, usdc, usdt];
 }
 
 /**

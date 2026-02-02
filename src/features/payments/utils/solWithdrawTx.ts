@@ -16,6 +16,7 @@ import {
 } from '@solana/spl-token';
 import { config } from '@core/config/environment';
 import { decryptPrivateKey } from '@shared/utils/encryption';
+import { getAllTokenBalances } from '@shared/utils/getTokenBalances';
 
 const connection = new Connection(config.solMainnet, 'confirmed');
 
@@ -57,9 +58,8 @@ export async function executeSolTransfer(user: any, toAddress: string, amount: n
       throw new Error('Invalid recipient address');
     }
 
-    // 3. Check sender's balance
-    const balance = await connection.getBalance(fromWallet.publicKey);
-    const solBalance = balance / LAMPORTS_PER_SOL;
+    // 3. Check sender's balance (using cache to avoid rate limits)
+    const { sol: solBalance } = await getAllTokenBalances(fromWallet.publicKey.toString());
 
     console.log(`[SOL Transfer] Sender: ${fromWallet.publicKey.toString()}`);
     console.log(`[SOL Transfer] Balance: ${solBalance} SOL`);
@@ -69,7 +69,7 @@ export async function executeSolTransfer(user: any, toAddress: string, amount: n
     const estimatedFee = 5000; // ~0.000005 SOL
     const totalNeeded = (amountInLamports + estimatedFee) / LAMPORTS_PER_SOL;
 
-    if (balance < amountInLamports + estimatedFee) {
+    if (solBalance < totalNeeded) {
       throw new Error(
         `Insufficient balance. You have: ${solBalance.toFixed(2)} SOL, You need: ${totalNeeded.toFixed(6)} SOL (including transaction fee)`
       );

@@ -1,6 +1,6 @@
 import { Context } from "telegraf";
 import { getOrderState, clearOrderState } from "@shared/state/orderState";
-import { executeOrder } from "@features/trading/utils/executeOrder";
+import { executeBuyOrder } from "@src/features/trading/utils/executeBuyOrder";
 
 export class BuyCallbackHandlers {
   public static async handleApprove(ctx: Context) {
@@ -25,7 +25,7 @@ export class BuyCallbackHandlers {
 
     await ctx.answerCbQuery("Executing order...");
 
-    const result = await executeOrder(ctx, orderState.transactionBase64, orderState.requestId);
+    const result = await executeBuyOrder(ctx, orderState.transactionBase64, orderState.requestId);
 
     if (result.success) {
       const responseMsg = `✅ Swap successful!\n\n<a href="${result.explorerUrl}">View on Solscan</a>\n\nYou received ${(result.amountReceived / Math.pow(10, decimals)).toFixed(4)} ${symbol}`;
@@ -43,10 +43,10 @@ export class BuyCallbackHandlers {
 
   public static async handleDecline(ctx: Context) {
     if (!ctx.from) {
-      return ctx.reply("User not identified.");
+      return ctx.reply("User not found.");
     }
-    await ctx.answerCbQuery("Order declined.");
-    await ctx.editMessageText("Buy order has been declined.");
+    await ctx.answerCbQuery("Order cancelled.");
+    await ctx.editMessageText("Buy order has been cancelled.");
     clearOrderState(ctx.from.id);
   }
 }

@@ -153,6 +153,10 @@ const userSchema = new mongoose.Schema(
       enum: ["user", "admin"],
       default: "user",
     },
+    slippage_preference: {
+      type: Number,
+      default: 100, // Default 1%
+    },
   },
   {
     timestamps: true,

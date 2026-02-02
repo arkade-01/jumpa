@@ -31,7 +31,7 @@ export async function handleSell(ctx: Context) {
     const { contractAddress: tokenAddress, symbol, decimals } = tradeInfo;
 
     let userTokenBalance; //initialize user token balance
-    const slippageBps = 200; // Hardcoded the slippage for now
+    const slippageBps = user.slippage_preference;
 
     //GET TOKEN BALANCE HERE BEFORE PROCEEDING
     const connection = new Connection(config.solMainnet);
@@ -86,6 +86,14 @@ export async function handleSell(ctx: Context) {
     setOrderState(ctx.from.id, {
       transactionBase64: order.transactionBase64,
       requestId: order.requestId,
+      tokenAddress,
+      symbol,
+      decimals,
+      amountNative: order.outAmount, // SOL amount in lamports
+      amountUsd: order.outUsdValue,
+      slippageBps,
+      feeNative: order.fee,
+      tokenAmount: amountToSell, // token amount being sold
     });
 
     // The outAmount is in the smallest unit of the token.
@@ -93,7 +101,7 @@ export async function handleSell(ctx: Context) {
     // For now, we display the raw amount with formatting.
     const formattedOutAmount = (order.outAmount / 1e9).toFixed(6);
 
-    const feeInSol = order.fee / 1e9;
+    const feeInSol = (order.fee || 0) / 1e9;
 
     const orderDetails = `
 <b>Order Details</b>
@@ -106,7 +114,7 @@ export async function handleSell(ctx: Context) {
 <b>You will receive approximately:</b> ${formattedOutAmount} SOL
 
 <b>Price Impact:</b> ${order.priceImpact.toFixed(2)}%
-<b>Fee:</b> ${feeInSol.toFixed(9)} SOL
+<b>Fees:</b> ${feeInSol.toFixed(4)} SOL
 `;
 
     await ctx.replyWithHTML(

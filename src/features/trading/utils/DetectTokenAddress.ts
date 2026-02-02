@@ -56,31 +56,42 @@ export async function generateTokenInfoMessage(contractAddress: string) {
   } = token;
   console.log("Token Info:", token)
 
-  // Compute 24h stats safely
+  // Compute stats safely
   const priceChange = stats24h?.priceChange ?? 0;
-  const priceChangeString = priceChange > 0 ? `+${priceChange.toFixed(2)}` : priceChange.toFixed(2);
+  const priceChange5m = stats24h?.priceChange5m ?? 0;
+  const priceChange15m = stats24h?.priceChange15m ?? 0;
+
+  const formatChange = (val: number) => {
+    const sign = val > 0 ? "+" : "";
+    return `${sign}${val.toFixed(2)}%`;
+  };
+
+  const formatCompact = (num: number | undefined) => {
+    if (!num) return "N/A";
+    if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
+    if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
+    if (num >= 1e3) return `$${(num / 1e3).toFixed(2)}K`;
+    return `$${num.toLocaleString()}`;
+  };
+
+  const priceChangeString = formatChange(priceChange);
   const numTraders = stats24h?.numTraders ?? 0;
-  const priceEmoji = priceChange > 0 ? "🟢" : "🔴";
 
   // 🧮 Build Telegram message for private chat
   const metricsMessage = `
-<b>${name || "Unknown_Token"} (${symbol || "?"})</b>
-${icon ? `<a href="${icon}">🖼️</a>` : ""}
+<b>${name || "Token"} (${symbol || "?"})</b>
+${icon ? `<a href="${icon}">&#8205;</a>` : ""}
+<code>${contractAddress}</code>
 
-<b>Contract:</b> <code>${contractAddress}</code>
-<b>Verified:</b> ${token.isVerified ? "✅ Yes" : "❌ No"}
-<b>Holders:</b> ${holderCount?.toLocaleString() ?? "N/A"}
+<b>Price:</b> ${usdPrice?.toFixed(6) ?? "00"}
+<b>5m:</b> ${formatChange(priceChange5m)} | <b>15m:</b> ${formatChange(priceChange15m)} | <b>24h:</b> ${formatChange(priceChange)}
+<b>Liquidity:</b> ${formatCompact(liquidity)}
+<b>MCap:</b> ${formatCompact(mcap)}
+<b>FDV:</b> ${formatCompact(fdv)}
+<b>Circulating Supply:</b> ${circSupply ? (circSupply >= 1e9 ? (circSupply / 1e9).toFixed(2) + "B" : (circSupply / 1e6).toFixed(2) + "M") : "N/A"}
 
-💵 <b>Price:</b> ${usdPrice?.toFixed(6) ?? "N/A"}
-📈 <b>24h Change:</b> ${priceChangeString}%
-💧 <b>Liquidity:</b> ${liquidity ? liquidity.toLocaleString() : "N/A"}
-🏦 <b>Market Cap:</b> ${mcap ? mcap.toLocaleString() : "N/A"}
-💰 <b>FDV:</b> ${fdv ? fdv.toLocaleString() : "N/A"}
-🧮 <b>Circulating Supply:</b> ${circSupply?.toLocaleString() ?? "N/A"}
-
-Mint Authority Disabled: ${audit?.mintAuthorityDisabled ? "✅" : "❌"}
-Freeze Authority Disabled: ${audit?.freezeAuthorityDisabled ? "✅" : "❌"}
-24h Traders: ${numTraders?.toLocaleString() ?? "N/A"}
+<b>Holders:</b> ${holderCount?.toLocaleString() ?? "00"}
+<b>24h Traders:</b> ${numTraders?.toLocaleString() ?? "N/A"}
   `;
 
   // 🧮 Build Telegram message for group chat
@@ -89,20 +100,19 @@ Freeze Authority Disabled: ${audit?.freezeAuthorityDisabled ? "✅" : "❌"}
 
 <code>${contractAddress}</code>
 
-<b>${name || "Unknown_Token"} (${symbol || "?"})</b>
+<b>${name || "Token"} (${symbol || "?"})</b>
 ${icon ? `<a href="${icon}">🖼️</a>` : ""}
 
-<b>Verified:</b> ${token.isVerified ? "✅" : "❌"}
-<b>Organic Score:</b> ${token.organicScoreLabel ? token.organicScoreLabel.toUpperCase() : "N/A"}
 
-💵 <b>Price:</b> ${usdPrice?.toFixed(6) ?? "N/A"} USD
-📈 <b>24h Change:</b>${priceEmoji} ${priceChangeString}%
-💧 <b>Liquidity:</b> ${liquidity ? `$${liquidity.toLocaleString()}` : "N/A"}
-🏦 <b>Mkt Cap:</b> ${mcap ? `$${mcap.toLocaleString()}` : "N/A"}
-💰 <b>FDV:</b> ${fdv ? `$${fdv.toLocaleString()}` : "N/A"}
 
-👥 <b>Holders:</b> ${holderCount?.toLocaleString() ?? "N/A"}
-📊 <b>24h Traders:</b> ${numTraders?.toLocaleString() ?? "N/A"}
+<b>Price:</b> ${usdPrice?.toFixed(6) ?? "N/A"}
+<b>24h Change:</b> ${priceChangeString}%
+<b>Liquidity:</b> ${liquidity ? `$${liquidity.toLocaleString()}` : "N/A"}
+<b>MCap:</b> ${mcap ? `$${mcap.toLocaleString()}` : "N/A"}
+<b>FDV:</b> ${fdv ? `$${fdv.toLocaleString()}` : "N/A"}
+
+<b>Holders:</b> ${holderCount?.toLocaleString() ?? "N/A"}
+<b>24h Traders:</b> ${numTraders?.toLocaleString() ?? "N/A"}
 
 ${token.twitter ? `<a href="${token.twitter}">Twitter</a>` : ""} || ${token.website ? `<a href="${token.website}">Website</a>` : ""} || ${token.discord ? `<a href="${token.discord}">Discord</a>` : ""}
 

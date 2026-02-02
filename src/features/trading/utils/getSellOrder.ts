@@ -5,7 +5,7 @@ export async function getSellOrder(ctx: Context, tokenAddress: string, amount: n
   if (!ctx.from) {
     return {
       success: false,
-      error: "User not identified",
+      error: "User not found",
     };
   }
   const user = await User.findOne({ telegram_id: ctx.from.id });
@@ -20,7 +20,7 @@ export async function getSellOrder(ctx: Context, tokenAddress: string, amount: n
   if (!takerAddress) {
     return {
       success: false,
-      error: "Buyer wallet address not found.",
+      error: "User wallet address not found.",
     };
   }
 

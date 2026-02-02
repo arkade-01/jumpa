@@ -8,4 +8,5 @@ export { GroupCallbackHandlers } from "@features/groups/callbacks/GroupCallbackH
 export { DepositCommand } from "@features/payments/commands/DepositCommand";
 export { CloseGroupHandlers } from "@features/groups/callbacks/CloseGroupHandlers";
 export { ExitGroupHandlers } from "@features/groups/callbacks/ExitGroupHandlers";
+export { ProfitAndLossTestCommand } from "@features/onboarding/commands/ProfitAndLossTestCommand";
 export { CommandManager } from "./CommandManager";

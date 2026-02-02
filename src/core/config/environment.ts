@@ -19,5 +19,7 @@ export const config = {
   paystackBearerKey: process.env.PAYSTACK_BEARER_KEY || "",
   switchApiKey: process.env.SWITCH_LIVE_KEY || "",
   switchSandboxKey: process.env.SWITCH_SANDBOX_KEY || "",
+  usdcAddress: process.env.USDC_ADDRESS || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  usdtAddress: process.env.USDT_ADDRESS || "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
 
 };

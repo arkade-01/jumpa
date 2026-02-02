@@ -17,6 +17,36 @@ RESPONSE RULES:
 - NO explanations, NO reasoning, NO thinking out loud
 - When asking for information, ask ONLY the question
 
+IMAGE PROCESSING:
+- If the user provides an image, scan it for withdrawal details:
+  - Account Number
+  - Bank Name
+  - Account Name
+  - Amount (if visible)
+- Extract chain and currency from the user's message (e.g., "send from my usdc on sol" means SOLANA and USDC)
+- If user sends MULTIPLE images simultaneously, treat as bulk transfer (extract details from each image)
+
+BANK TRANSFER WORKFLOW:
+1. Extract account number, bank name, amount from image
+2. Call 'validate_withdrawal_details' to verify the account (this returns the verified account_name)
+3. Extract chain and currency from the user's text message
+4. Once you have ALL details (amount, account_number, bank_name, account_name, chain, currency):
+   → IMMEDIATELY call 'confirm_withdrawal' tool
+   → DO NOT ask for user confirmation before calling the tool
+   → The tool will trigger the PIN flow automatically
+5. If any details are missing, ask ONLY for the missing ones
+
+BULK TRANSFER WORKFLOW:
+1. Detect bulk intent: Multiple images OR user says "send to each" OR lists multiple accounts
+2. Extract details for EACH recipient (up to 5 maximum)
+3. Validate ALL accounts in parallel using 'validate_withdrawal_details'
+4. Extract common chain and currency from user's message
+5. Once you have ALL recipient details:
+   → IMMEDIATELY call 'confirm_bulk_withdrawal' tool with recipients array
+   → Each recipient can have different amount
+   → DO NOT ask for confirmation before calling the tool
+6. The tool will trigger bulk PIN flow with summary of all transfers
+
 SUPPORTED MODES:
 1. **BANK TRANSFER**: User wants to send money to a Nigerian Bank Account.
    - Destination: Bank Name + Account Number.
@@ -69,7 +99,7 @@ User: "Send 10 AMA to [Address]"
 `;
 
 export interface AgentResponse {
-  type: "text" | "confirmation" | "error" | "signature_request";
+  type: "text" | "confirmation" | "bulk_confirmation" | "error" | "signature_request";
   message?: string;
   data?: any;
   updatedHistory?: any[];
@@ -77,7 +107,7 @@ export interface AgentResponse {
 
 export async function processUserQuery(
   userId: number,
-  userMessage: string,
+  userMessage: string | Array<any>,
   previousHistory: any[] = []
 ): Promise<AgentResponse> {
   if (!anthropic) {
@@ -85,16 +115,18 @@ export async function processUserQuery(
     return { type: "error", message: "AI Service Not Configured" };
   }
 
-  // Input validation
-  const MAX_MESSAGE_LENGTH = 10000; //to accommodate long messages from tool responses
-  if (userMessage.length > MAX_MESSAGE_LENGTH) {
+  // Input validation for text-only messages
+  const MAX_MESSAGE_LENGTH = 10000;
+  if (typeof userMessage === 'string' && userMessage.length > MAX_MESSAGE_LENGTH) {
     return { type: "error", message: "Message too long. Please keep it under 10000 characters." };
   }
 
-  const BLOCKED_PATTERNS = [/\<script\>/i, /javascript:/i];
-  for (const pattern of BLOCKED_PATTERNS) {
-    if (pattern.test(userMessage)) {
-      return { type: "error", message: "Invalid input." };
+  if (typeof userMessage === 'string') {
+    const BLOCKED_PATTERNS = [/\<script\>/i, /javascript:/i];
+    for (const pattern of BLOCKED_PATTERNS) {
+      if (pattern.test(userMessage)) {
+        return { type: "error", message: "Invalid input." };
+      }
     }
   }
 
@@ -103,7 +135,16 @@ export async function processUserQuery(
     const tools = await MCPRegistry.getInstance().getAllTools();
 
     // Start with previous history and append the new user message
-    let messages: any[] = [...previousHistory, { role: "user", content: userMessage }];
+    let messages: any[] = [...previousHistory];
+
+    // Add new message correctly based on type
+    if (Array.isArray(userMessage)) {
+      // It's a multimodal message (e.g. text + image)
+      messages.push({ role: "user", content: userMessage });
+    } else {
+      // It's a simple text string
+      messages.push({ role: "user", content: userMessage });
+    }
 
     // Run the loop (max 5 turns to prevent infinite loops)
     for (let i = 0; i < 5; i++) {
@@ -143,7 +184,16 @@ export async function processUserQuery(
               };
             }
 
-            // 2. Execute Generic/MCP Tool
+            // 2. Handle Bulk Withdrawal Confirmation
+            if (toolName === "confirm_bulk_withdrawal") {
+              return {
+                type: "bulk_confirmation",
+                data: toolInput,
+                updatedHistory: messages
+              };
+            }
+
+            // 3. Execute Generic/MCP Tool
             try {
               const result = await MCPRegistry.getInstance().executeTool(toolName, toolInput);
 

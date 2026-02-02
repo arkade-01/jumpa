@@ -1,11 +1,11 @@
 import { Context } from "telegraf";
 import User from "@core/database/models/user";
 
-export async function getOrder(ctx: Context, tokenAddress: string, amount: number, slippageBps: number, buyerAddress: string) {
+export async function getBuyOrder(ctx: Context, tokenAddress: string, amount: number, slippageBps: number, buyerAddress: string) {
   if (!ctx.from) {
     return {
       success: false,
-      error: "User not identified",
+      error: "User not found",
     };
   }
   const user = await User.findOne({ telegram_id: ctx.from.id });
@@ -17,13 +17,13 @@ export async function getOrder(ctx: Context, tokenAddress: string, amount: numbe
   }
 
   const inputAmount = amount * 1e9; // Convert to lamports
-  const slippage = 200; //2% slippage. Hardcoded for now.
+  const slippage = slippageBps;
   const takerAddress = user.solanaWallets[0].address;
 
   if (!takerAddress) {
     return {
       success: false,
-      error: "Buyer wallet address not found.",
+      error: "User wallet address not found.",
     };
   }
 

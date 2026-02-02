@@ -1,5 +1,5 @@
 import { Context, Markup } from "telegraf";
-import { getOrder } from "./getOrder";
+import { getBuyOrder } from "./getBuyOrder";
 import User from "@core/database/models/user";
 import { setOrderState } from "@shared/state/orderState";
 import { getTradeState, clearTradeState } from "@shared/state/tradeState";
@@ -22,11 +22,11 @@ export async function createBuyOrder(ctx: Context, tradeId: string, amount: numb
         }
         const { contractAddress: tokenAddress, symbol, decimals } = tradeInfo;
 
-        const slippageBps = 200; // 2% Hardcoded the slippage for now
+        const slippageBps = user.slippage_preference;
 
         // await ctx.answerCbQuery("Fetching order details...");
 
-        const order = await getOrder(
+        const order = await getBuyOrder(
             ctx,
             tokenAddress,
             amount,
@@ -52,10 +52,18 @@ export async function createBuyOrder(ctx: Context, tradeId: string, amount: numb
         setOrderState(ctx.from.id, {
             transactionBase64: order.transactionBase64,
             requestId: order.requestId,
+            tokenAddress,
+            symbol,
+            decimals,
+            amountNative: amount * 1e9, // Convert SOL to lamports
+            amountUsd: order.inUsdValue,
+            slippageBps,
+            feeNative: order.fee,
+            tokenAmount: order.outAmount,
         });
 
         const formattedOutAmount = (order.outAmount / Math.pow(10, decimals)).toFixed(4);
-        const feeInSol = order.fee / 1e9;
+        const feeInSol = (order.fee || 0)/ 1e9;
 
         const orderDetails = `
 <b>Order Details</b>
@@ -66,7 +74,7 @@ export async function createBuyOrder(ctx: Context, tradeId: string, amount: numb
 -------------------
 <b>You will receive:</b> ${formattedOutAmount} ${symbol}\n
 <b>Price Impact:</b> ${order.priceImpact.toFixed(2)}%
-<b>Fee:</b> ${feeInSol.toFixed(9)} SOL
+<b>Fee:</b> ${feeInSol.toFixed(4)} SOL
 `;
 
         await ctx.replyWithHTML(

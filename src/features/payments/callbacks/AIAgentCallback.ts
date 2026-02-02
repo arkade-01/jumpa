@@ -42,11 +42,20 @@ export class AICallbackHandler {
    */
   static async handleAIQuery(ctx: Context): Promise<void> {
     try {
-      if (!ctx.message || !("text" in ctx.message)) {
+      const message = ctx.message as any;
+      console.log("[AI Image Handler] Message received:", {
+        hasText: !!message?.text,
+        hasPhoto: !!message?.photo,
+        hasCaption: !!message?.caption,
+        photoCount: message?.photo?.length || 0
+      });
+
+      if (!message || (!message.text && !message.photo && !message.caption)) {
+        console.log("[AI Image Handler] Message rejected - no text, photo, or caption");
         return;
       }
 
-      const userMessage = ctx.message.text;
+      const userMessage = message.text || message.caption || "";
       const userId = ctx.from?.id;
 
       // Check for PIN entry state first - bypass AI if we are waiting for PIN
@@ -68,22 +77,34 @@ export class AICallbackHandler {
       }
 
       // Dynamic Intent Check: Check if message matches any tool keyword
+      // If image is present, process it
       const keywords = await MCPRegistry.getInstance().getDynamicKeywords();
       const hasWithdrawalKeyword = keywords.some(k => userMessage.toLowerCase().includes(k));
+      const hasPhoto = !!message.photo;
 
       // Retrieve existing state to check if we are in an active conversation
       const currentState = getAIWithdrawalState(userId);
       const isProcessing = currentState?.step === "processing";
 
-      // If NOT in active processing AND no keywords, skip
-      if (!isProcessing && !hasWithdrawalKeyword) {
+      console.log("[AI Image Handler] Intent check:", {
+        hasWithdrawalKeyword,
+        hasPhoto,
+        isProcessing,
+        keywords: keywords.slice(0, 5)
+      });
+
+      // If NOT in active processing AND no keywords AND no photo, skip
+      if (!isProcessing && !hasWithdrawalKeyword && !hasPhoto) {
+        console.log("[AI Image Handler] Skipping - no active processing, keywords, or photo");
         return;
       }
 
-      // IMPORTANT: If this is a NEW withdrawal request (has keywords), clear old state
+      console.log("[AI Image Handler] Processing message - conditions met");
+
+      // IMPORTANT: If this is a NEW withdrawal request (has keywords or photo), clear old state
       // This prevents history pollution from previous requests
       let history: any[] = [];
-      if (hasWithdrawalKeyword) {
+      if (hasWithdrawalKeyword || hasPhoto) {
         // New request - start fresh
         clearAIWithdrawalState(userId);
         history = [];
@@ -105,26 +126,64 @@ export class AICallbackHandler {
       // If this is a new session, inject the signer info
       if (!history.length && systemInjection) {
         history.push({ role: "user", content: systemInjection });
-        // Note: we add it as a fake user message or assistant "thought" so it sticks in context
-        // A better way for Anthropic is to just prepend it to the user message or as a separate user/assistant turn.
-        // Let's prepend to the actual user message for simplicity in this turn
       }
 
       // Call the AI Agent
-      // If we have a system injection, we can pass it as part of the message if history is empty
-      // Or if history exists, relying on the fact that we should have it?
-      // Actually, let's just prepend to userMessage if it's a new request or ensure it's in context.
+      let finalMessage: string | any[] = userMessage;
 
-      let finalMessage = userMessage;
-      if (systemInjection) {
+      // Handle Photo Processing
+      if (hasPhoto) {
+        console.log("[AI Image Handler] Photo detected - starting processing");
+        await ctx.sendChatAction("upload_photo");
+
+        // Get the largest photo (last in array)
+        const photo = message.photo[message.photo.length - 1];
+        const fileId = photo.file_id;
+        console.log("[AI Image Handler] Photo file ID:", fileId);
+
+        try {
+          const fileLink = await ctx.telegram.getFileLink(fileId);
+          console.log("[AI Image Handler] Got file link:", fileLink.toString());
+
+          // Fetch the image
+          const response = await fetch(fileLink.toString());
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          const base64Image = buffer.toString("base64");
+          console.log("[AI Image Handler] Image downloaded and converted to base64, size:", base64Image.length, "chars");
+
+          // Construct Multimodal Message
+          finalMessage = [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: "image/jpeg", // Telegram photos are usually JPEGs
+                data: base64Image,
+              },
+            },
+            {
+              type: "text",
+              text: userMessage || "Please extract the withdrawal details from this image.",
+            }
+          ];
+          console.log("[AI Image Handler] Multimodal message constructed with", finalMessage.length, "blocks");
+        } catch (err) {
+          console.error("[AI Image Handler] Error processing photo:", err);
+          return;
+        }
+      } else if (systemInjection && !history.length) {
+        // If text only and system injection needed
         finalMessage = `${systemInjection}\n\n${userMessage}`;
       }
 
+      console.log("[AI Image Handler] Calling processUserQuery with message type:", Array.isArray(finalMessage) ? 'multimodal' : 'text');
       const aiResponse = await processUserQuery(userId, finalMessage, history);
+      console.log("[AI Image Handler] AI Response type:", aiResponse.type);
 
       if (aiResponse.type === "error") {
         console.error(`[AI Withdrawal] AI Error: ${aiResponse.message} ${aiResponse?.data} ${aiResponse?.type}`);
-        // Optional: reply to user about error, or just ignore if unrelated
+        // Silent failure as requested
         return;
       }
 
@@ -159,6 +218,18 @@ export class AICallbackHandler {
           chain: data.chain,
           currency: data.currency,
           wallet_address: data.wallet_address,
+        });
+      }
+
+      if (aiResponse.type === "bulk_confirmation") {
+        // Agent confirmed bulk withdrawal
+        const data = aiResponse.data;
+        console.log("[AI Withdrawal] AI confirmed bulk withdrawal:", data);
+
+        await AICallbackHandler.initiateBulkPINFlow(ctx, {
+          recipients: data.recipients,
+          chain: data.chain,
+          currency: data.currency,
         });
       }
 
@@ -284,6 +355,57 @@ export class AICallbackHandler {
   }
 
   /**
+   * Sets up the state for bulk transfer PIN entry
+   */
+  private static async initiateBulkPINFlow(ctx: Context, data: any): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    // Store state with bulk recipients
+    setAIWithdrawalState(userId, "awaiting_bulk_pin", {
+      recipients: data.recipients,
+      chain: data.chain,
+      currency: data.currency,
+      pinAttempts: 0
+    });
+
+    // Build confirmation message showing all recipients
+    let recipientList = "";
+    let totalNGN = 0;
+
+    for (let i = 0; i < data.recipients.length; i++) {
+      const recipient = data.recipients[i];
+      const amount = recipient.amount;
+      let destination = "";
+
+      if (recipient.wallet_address) {
+        destination = `${recipient.wallet_address.slice(0, 6)}...${recipient.wallet_address.slice(-4)}`;
+      } else {
+        destination = `${recipient.account_name} (${recipient.bank_name})`;
+      }
+
+      recipientList += `${i + 1}. ${destination} - *${amount.toLocaleString()} ${recipient.amount_currency}*\n`;
+
+      if (recipient.amount_currency === 'NGN') {
+        totalNGN += amount;
+      }
+    }
+
+    const confirmationMessage =
+      `*Please enter your 4-digit PIN to confirm Bulk Transfer:*\n\n` +
+      `Recipients (${data.recipients.length}):\n${recipientList}\n` +
+      `Chain: *${data.chain}*\n` +
+      `Currency: *${data.currency}*\n`;
+
+    await ctx.reply(confirmationMessage, {
+      parse_mode: "Markdown",
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback("❌ Cancel", "ai_withdraw_cancel")]
+      ])
+    });
+  }
+
+  /**
    * Handle withdrawal cancellation
    */
   static async handleWithdrawalCancellation(ctx: Context): Promise<void> {
@@ -355,7 +477,7 @@ export class AICallbackHandler {
     }
 
     const state = getAIWithdrawalState(userId);
-    if (!state || state.step !== "awaiting_pin") {
+    if (!state || (state.step !== "awaiting_pin" && state.step !== "awaiting_bulk_pin")) {
       return;
     }
 
@@ -422,8 +544,12 @@ export class AICallbackHandler {
       `[AI Withdrawal] PIN verified for user ${userId}, executing withdrawal`
     );
 
-    // Execute withdrawal
-    await AICallbackHandler.executeWithdrawal(ctx, state.data, user);
+    // Execute withdrawal (single or bulk)
+    if (state.step === "awaiting_bulk_pin") {
+      await AICallbackHandler.executeBulkWithdrawal(ctx, state.data, user);
+    } else {
+      await AICallbackHandler.executeWithdrawal(ctx, state.data, user);
+    }
   }
 
   /**
@@ -497,67 +623,45 @@ Please submit the transaction now.`;
   }
 
   /**
-   * Execute the actual withdrawal transaction
+   * Internal method: Execute a single transfer WITHOUT messaging or state management
+   * Returns result object for bulk processing
    */
-  private static async executeWithdrawal(
+  private static async _executeSingleTransferSilent(
     ctx: Context,
     data: any,
     user: any
-  ): Promise<void> {
+  ): Promise<{ success: boolean, error?: string, transactionId?: string, recipient: string }> {
     const userId = ctx.from?.id;
-    if (!userId) return;
+    if (!userId) {
+      return { success: false, error: "No user ID", recipient: "unknown" };
+    }
 
     try {
       let recipientAddress = "";
+      let recipientName = data.wallet_address || `${data.accountName || data.account_name}`;
 
-      // ==========================================
-      // FLOW A: DIRECT CRYPTO TRANSFER (ON-CHAIN)
-      // ==========================================
+      // FLOW A: DIRECT CRYPTO TRANSFER
       if (data.wallet_address) {
-        console.log(`[AI Withdrawal] Executing Direct Crypto Transfer to ${data.wallet_address} `);
+        console.log(`[Silent Transfer] Crypto transfer to ${data.wallet_address}`);
         recipientAddress = data.wallet_address;
-
-        // No Yara Widget needed. Direct blockchain transfer.
-        // We'll set fiatPayoutAmount to user's amount (just for record keeping, though usually fees apply)
-
-        // We call the transfer functions directly later in the code.
-        // Just need to skip the Yara widget creation block.
-
       }
-      // ==========================================
       // FLOW B: BANK TRANSFER (VIA YARA)
-      // ==========================================
       else {
-        console.log(`[AI Withdrawal] Executing Bank Transfer via Yara`);
+        console.log(`[Silent Transfer] Bank transfer via Yara`);
 
         const bankName = data.bankName || data.bank_name;
-        // Get Yara bank code (different from Paystack bank code)
         const yaraBankCode = findYaraBankCode(bankName);
+
         if (!yaraBankCode) {
-          console.error(
-            `[AI Withdrawal] Yara bank code not found for: ${bankName} `
-          );
-          await ctx.reply(
-            `❌ Bank "${bankName}" is not supported for withdrawals.Please contact support.`
-          );
-          clearAIWithdrawalState(userId);
-          return;
+          return { success: false, error: `Bank "${bankName}" not supported`, recipient: recipientName };
         }
 
-        console.log(
-          `[AI Withdrawal] Using Yara bank code: ${yaraBankCode} for ${bankName}`
-        );
-
-        // Create payment widget
         const widget = config.paymentWidgetUrl;
         if (!widget) {
-          await ctx.reply("❌ Payment widget URL not configured");
-          clearAIWithdrawalState(userId);
-          return;
+          return { success: false, error: "Payment widget URL not configured", recipient: recipientName };
         }
 
         const recipientNumber = data.recipient || data.account_number;
-
         const paymentOptions = {
           sender: {},
           recipient: {
@@ -567,7 +671,7 @@ Please submit the transaction now.`;
             phoneNumber: "+2348060864466",
             bankAccount: {
               accountNumber: recipientNumber,
-              bankCode: yaraBankCode, // Use Yara bank code for payment widget
+              bankCode: yaraBankCode,
             },
             address: "Jumpabot",
             city: "Jumpabot",
@@ -582,8 +686,6 @@ Please submit the transaction now.`;
           payoutType: "DIRECT_DEPOSIT",
         };
 
-        console.log("[AI Withdrawal] Creating payment widget:", paymentOptions);
-
         const getPaymentWidget = await fetch(widget, {
           method: "POST",
           headers: {
@@ -596,31 +698,24 @@ Please submit the transaction now.`;
 
         if (!getPaymentWidget.ok) {
           const errorText = await getPaymentWidget.text();
-          throw new Error(
-            `Payment widget API error: ${getPaymentWidget.status} - ${errorText} `
-          );
+          return {
+            success: false,
+            error: `Payment widget error: ${getPaymentWidget.status}`,
+            recipient: recipientName
+          };
         }
 
         const paymentWidget = await getPaymentWidget.json();
-        console.log("[AI Withdrawal] Payment widget created:", paymentWidget);
 
         if (paymentWidget.error) {
-          await ctx.reply(`❌ Withdrawal failed: ${paymentWidget.error} `);
-          clearAIWithdrawalState(userId);
-          return;
+          return { success: false, error: paymentWidget.error, recipient: recipientName };
         }
 
-        // Yara returns an address where WE should send funds to settle the payment
         const solAddress = paymentWidget.data.solAddress;
         const ethAddress = paymentWidget.data.ethAddress;
-
-        // This is the address we send TO
         recipientAddress = data.chain === "SOLANA" ? solAddress : ethAddress;
 
-        console.log(`[AI Withdrawal] Yara requires funding at: ${recipientAddress} `);
-
-        // Save Widget Transaction to DB
-        // ... (Database logic can remain similar, focusing on tracking)
+        // Save to DB with batch_id if provided
         await Withdrawal.create({
           telegram_id: userId,
           transaction_id: paymentWidget.data.id,
@@ -628,91 +723,93 @@ Please submit the transaction now.`;
           depositAmount: paymentWidget.data.depositAmount,
           yaraWalletAddress: recipientAddress,
           status: paymentWidget.data.status,
+          batch_id: data.batch_id, // Optional batch ID for grouping
         });
       }
 
-      console.log(
-        `[AI Withdrawal] Recipient address(${data.chain}): ${recipientAddress} | Amount: ${data.cryptoAmount} `
-      );
-
-      // Execute withdrawal based on chain and currency using pure transaction utilities
+      // Execute blockchain transfer
       let initTx;
       const depositAmount = Number(data.cryptoAmount);
-      await sendOrEdit(ctx, "Processing withdrawal...");
 
       if (data.chain === "SOLANA") {
         if (data.currency === "SOL") {
-          initTx = await executeSolTransfer(
-            user,
-            recipientAddress,
-            depositAmount
-          );
+          initTx = await executeSolTransfer(user, recipientAddress, depositAmount);
         } else if (data.currency === "USDC") {
-          initTx = await executeUSDCTransfer(
-            user,
-            recipientAddress,
-            depositAmount
-          );
+          initTx = await executeUSDCTransfer(user, recipientAddress, depositAmount);
         } else if (data.currency === "USDT") {
-          initTx = await executeUSDTTransfer(
-            user,
-            recipientAddress,
-            depositAmount
-          );
+          initTx = await executeUSDTTransfer(user, recipientAddress, depositAmount);
         }
       } else if (data.chain === "BASE" || data.chain === "CELO") {
         if (data.currency === "ETH") {
-          initTx = await executeETHTransfer(
-            user,
-            recipientAddress,
-            depositAmount,
-            data.chain
-          );
+          initTx = await executeETHTransfer(user, recipientAddress, depositAmount, data.chain);
         } else if (data.currency === "USDC") {
-          initTx = await executeUSDCTransferEVM(
-            user,
-            recipientAddress,
-            depositAmount,
-            data.chain
-          );
+          initTx = await executeUSDCTransferEVM(user, recipientAddress, depositAmount, data.chain);
         } else if (data.currency === "USDT") {
-          initTx = await executeUSDTTransferEVM(
-            user,
-            recipientAddress,
-            depositAmount,
-            data.chain
-          );
+          initTx = await executeUSDTTransferEVM(user, recipientAddress, depositAmount, data.chain);
         } else if (data.currency === "CELO" && data.chain === "CELO") {
-          initTx = await executeCELOTransfer(
-            user,
-            recipientAddress,
-            depositAmount
-          );
+          initTx = await executeCELOTransfer(user, recipientAddress, depositAmount);
         }
       }
 
-      console.log("[AI Withdrawal] Transaction result:", initTx);
-
       if (initTx?.success) {
+        return {
+          success: true,
+          transactionId: initTx.signature || initTx.hash,
+          recipient: recipientName
+        };
+      } else {
+        return {
+          success: false,
+          error: initTx?.error || "Transfer failed",
+          recipient: recipientName
+        };
+      }
 
+    } catch (error: any) {
+      console.error("[Silent Transfer] Error:", error);
+      return {
+        success: false,
+        error: error.message,
+        recipient: data.accountName || data.wallet_address || "unknown"
+      };
+    }
+  }
+
+  /**
+   * Execute the actual withdrawal transaction
+   */
+  private static async executeWithdrawal(
+    ctx: Context,
+    data: any,
+    user: any
+  ): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    try {
+      await sendOrEdit(ctx, "Processing withdrawal...");
+
+      // Use silent method for actual transfer
+      const result = await AICallbackHandler._executeSingleTransferSilent(ctx, data, user);
+
+      if (result.success) {
         let successMsg = "";
 
         if (data.wallet_address) {
-          successMsg = `✅ ** Withdrawal Successful! **\n\n` +
-            `Sent: \`${depositAmount} ${data.currency}\`\n` +
+          successMsg = `✅ **Withdrawal Successful!**\n\n` +
+            `Sent: \`${Number(data.cryptoAmount)} ${data.currency}\`\n` +
             `To: \`${data.wallet_address}\`\n` +
             `Chain: ${data.chain}`;
         } else {
           successMsg = `✅ **Withdrawal Initiated!**\n\n` +
-            `Sent: ${depositAmount} ${data.currency}\n` +
+            `Sent: ${Number(data.cryptoAmount)} ${data.currency}\n` +
             `To: ${data.accountName || data.account_name}\n` +
             `Account credited shortly.`;
         }
 
         await sendOrEdit(ctx, successMsg, { parse_mode: "Markdown" });
-
       } else {
-        await sendOrEdit(ctx, `❌ Withdrawal failed: ${initTx?.error || "Unknown error"}`);
+        await sendOrEdit(ctx, `❌ Withdrawal failed: ${result.error || "Unknown error"}`);
       }
 
       clearAIWithdrawalState(userId);
@@ -722,5 +819,115 @@ Please submit the transaction now.`;
       clearAIWithdrawalState(userId);
     }
   }
-}
 
+  /**
+   * Execute bulk withdrawal - processes multiple recipients sequentially
+   */
+  private static async executeBulkWithdrawal(
+    ctx: Context,
+    data: any,
+    user: any
+  ): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    const { recipients, chain, currency } = data;
+    const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const results: Array<{ index: number, success: boolean, error?: string, recipient: string }> = [];
+
+    try {
+      await ctx.reply(`🔄 Processing ${recipients.length} transfers...`);
+
+      // Process each recipient sequentially
+      for (let i = 0; i < recipients.length; i++) {
+        const recipient = recipients[i];
+        console.log(`[Bulk Withdrawal] Processing ${i + 1}/${recipients.length}`);
+
+        // Convert NGN to crypto if needed
+        let cryptoAmount = recipient.amount;
+        if (recipient.amount_currency === 'NGN') {
+          try {
+            cryptoAmount = await convertNGNToCrypto(recipient.amount, currency, chain);
+            console.log(`[Bulk Withdrawal] Converted ${recipient.amount} NGN to ${cryptoAmount} ${currency}`);
+          } catch (e: any) {
+            console.error(`[Bulk Withdrawal] Conversion failed for recipient ${i + 1}:`, e);
+            results.push({
+              index: i + 1,
+              success: false,
+              error: `Currency conversion failed: ${e.message}`,
+              recipient: recipient.account_name || recipient.wallet_address || "Unknown"
+            });
+            continue;
+          }
+        }
+
+        const transferData = {
+          amount: recipient.amount,
+          amount_currency: recipient.amount_currency,
+          account_number: recipient.account_number,
+          bank_name: recipient.bank_name,
+          accountName: recipient.account_name,
+          wallet_address: recipient.wallet_address,
+          chain,
+          currency,
+          cryptoAmount: cryptoAmount, // Use converted amount
+          batch_id: batchId,
+        };
+
+        // Use silent method
+        const result = await AICallbackHandler._executeSingleTransferSilent(ctx, transferData, user);
+
+        results.push({
+          index: i + 1,
+          success: result.success,
+          error: result.error,
+          recipient: result.recipient
+        });
+
+        console.log(`[Bulk Withdrawal] ${i + 1}/${recipients.length}: ${result.success ? 'Success' : 'Failed'}`);
+
+        // Delay between transfers
+        if (i < recipients.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      // Format and send summary
+      const summary = AICallbackHandler._formatBulkSummary(results, recipients);
+      await ctx.reply(summary, { parse_mode: "Markdown" });
+
+      clearAIWithdrawalState(userId);
+
+    } catch (error: any) {
+      console.error("[Bulk Withdrawal] Fatal error:", error);
+      await ctx.reply(`❌ Bulk withdrawal failed: ${error.message}`);
+      clearAIWithdrawalState(userId);
+    }
+  }
+
+  /**
+   * Format bulk transfer summary
+   */
+  private static _formatBulkSummary(results: any[], recipients: any[]): string {
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.filter(r => !r.success).length;
+
+    let summary = `\n📊 **Bulk Transfer Complete**\n\n`;
+    summary += `Total: ${results.length} | ✅ Success: ${successCount} | ❌ Failed: ${failureCount}\n\n`;
+
+    for (const result of results) {
+      const recipient = recipients[result.index - 1];
+      const amount = recipient.amount;
+      const currency = recipient.amount_currency;
+
+      if (result.success) {
+        summary += `${result.index}. ✅ ${result.recipient} - ${amount} ${currency}\n\n`;
+      } else {
+        summary += `${result.index}. ❌ ${result.recipient} - Failed: ${result.error}\n\n`;
+      }
+    }
+
+    return summary;
+  }
+}

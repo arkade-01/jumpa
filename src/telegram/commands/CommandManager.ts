@@ -39,6 +39,10 @@ import {
 import { createBuyOrder } from "@features/trading/utils/createBuyOrder";
 import { handleRefresh } from "@telegram/callbacks/RefreshCallbackHandler";
 import {
+  handleManageTokens,
+  handleCarouselNavigate
+} from "@features/trading/callbacks/TokenCarouselHandler";
+import {
   handleExportPrivateKey,
   handleSelectWalletForExport,
   handleCancelExport,
@@ -51,6 +55,7 @@ import { GroupCommand } from "@features/groups/commands/GroupCommand";
 import { GroupInfoCommand } from "@features/groups/commands/GroupInfoCommand";
 import { LeaveGroupCommand } from "@features/groups/commands/LeaveGroupCommand";
 import { AICallbackHandler } from "@features/payments/callbacks/AIAgentCallback";
+import { ProfitAndLossTestCommand } from "@features/onboarding/commands/ProfitAndLossTestCommand";
 
 export class CommandManager {
   private commands: Map<string, BaseCommand> = new Map();
@@ -75,6 +80,7 @@ export class CommandManager {
       new JoinGroupCommand(),
       new ReferralCommand(),
       new ImageTestCommand(),
+      new ProfitAndLossTestCommand(),
       new DepositCommand(),
     ];
 
@@ -283,6 +289,10 @@ export class CommandManager {
     //register buy and sell commands for groups
     this.bot.action(/^groupBuy:.+/, handleGroupBuy);
 
+    // Register token carousel handlers
+    this.bot.action("manage_tokens", handleManageTokens);
+    this.bot.action(/^carousel_nav:.+/, handleCarouselNavigate);
+
     //register callback handlers for bank account
     this.bot.action("view_bank_account", BankHandler.getBankAccount);
     this.bot.action("update_bank_name", BankHandler.updateBankName);
@@ -419,6 +429,13 @@ export class CommandManager {
         }
         return;
       }
+      // Handle AI withdrawal PIN input
+      const aiWithdrawalState = getAIWithdrawalState(userId);
+      if (aiWithdrawalState?.step === "awaiting_pin" || aiWithdrawalState?.step === "awaiting_bulk_pin") {
+        await AICallbackHandler.handlePINInput(ctx);
+        return;
+      }
+
       // Detect if a solana address is sent
       // Solana address pattern
       const solanaAddressRegex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -461,6 +478,12 @@ export class CommandManager {
       // Examples: "send 2k to 8058509303 GT bank", "send 5 usdt to 0x000000000"
       // Only responds to withdrawal intents, ignores other messages
       console.log("Checking for withdrawal intent:", text);
+      await AICallbackHandler.handleAIQuery(ctx);
+    });
+
+    // Handle photo messages (for AI processing)
+    this.bot.on("photo", async (ctx) => {
+      console.log("Received photo message");
       await AICallbackHandler.handleAIQuery(ctx);
     });
 
