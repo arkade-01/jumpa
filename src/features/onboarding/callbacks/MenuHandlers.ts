@@ -26,6 +26,27 @@ export class MenuHandlers {
     }
   }
 
+  // Handle refresh balances callback - force refresh from blockchain
+  static async handleRefreshBalances(ctx: Context): Promise<void> {
+    try {
+      const telegramId = ctx.from?.id;
+      const username = ctx.from?.username || ctx.from?.first_name || "Unknown";
+
+      if (!telegramId) {
+        await ctx.answerCbQuery("❌ Unable to identify your account.");
+        return;
+      }
+
+      await ctx.answerCbQuery("🔄 Refreshing balances...");
+
+      // Display main menu with force refresh enabled
+      await displayMainMenu(ctx, telegramId, username, true);
+    } catch (error) {
+      console.error("Refresh balances error:", error);
+      await ctx.answerCbQuery("❌ Failed to refresh balances.");
+    }
+  }
+
   /**
    * Handle back to group menu callback
    */
@@ -84,17 +105,14 @@ export class MenuHandlers {
  **Group: ${grpInfo.data.name}**
 
 **Group ID:** \`${grpInfo.data.groupAddress}\`
-**Type:** ${
-        grpInfo.data.isPrivate
+**Type:** ${grpInfo.data.isPrivate
           ? "🔒 Private (requires approval)"
           : "🌐 Public (auto-approved)"
-      }
-**Status:** ${
-        (grpInfo.data.state as any) === "open" ? "🟢 Active" : "🔴 Paused"
-      }
-**Balance:** ${(grpInfo.data.totalContributions as any) || 0} ${
-        (grpInfo.data.currency as any) || "SOL"
-      }
+        }
+**Status:** ${(grpInfo.data.state as any) === "open" ? "🟢 Active" : "🔴 Paused"
+        }
+**Balance:** ${(grpInfo.data.totalContributions as any) || 0} ${(grpInfo.data.currency as any) || "SOL"
+        }
       `;
 
       const keyboard = Markup.inlineKeyboard([

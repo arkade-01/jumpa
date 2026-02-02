@@ -21,7 +21,7 @@ export function buildPrivateChatKeyboard(): {
       Markup.button.callback(" Help & Commands", "show_help"),
       Markup.button.callback(" About Jumpa", "show_about"),
     ],
-    [Markup.button.callback("🔄 Refresh", "back_to_menu")],
+    [Markup.button.callback("🔄 Refresh", "refresh_balances")],
   ]);
 }
 
@@ -48,7 +48,7 @@ export function buildGroupChatKeyboard(): {
       Markup.button.callback("➕ More Actions", "group_more_actions"),
       Markup.button.callback(" Help", "show_help"),
     ],
-    [Markup.button.callback("🔄 Refresh", "back_to_menu")],
+    [Markup.button.callback("🔄 Refresh", "refresh_balances")],
   ]);
 }
 

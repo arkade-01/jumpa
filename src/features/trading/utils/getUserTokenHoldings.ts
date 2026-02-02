@@ -24,9 +24,12 @@ export interface TokenHolding {
  * Get user's token holdings based on their trade history
  * Calculates net position (buys - sells) for each token
  * Only returns tokens with positive net positions
+ * @param telegramId - User's Telegram ID
+ * @param fetchPriceData - Whether to fetch live price data (default: true). Set to false for instant skeleton display.
  */
 export async function getUserTokenHoldings(
-  telegramId: number
+  telegramId: number,
+  fetchPriceData: boolean = true
 ): Promise<TokenHolding[]> {
   try {
     const holdings = await Trade.aggregate([
@@ -83,13 +86,28 @@ export async function getUserTokenHoldings(
       { $sort: { netAmount: -1 } }
     ]);
 
-    console.log("User token holdings:", holdings);
+    console.log(`User token holdings (fetchPriceData: ${fetchPriceData}):`, holdings.length, "tokens");
 
     if (holdings.length === 0) {
       return [];
     }
 
-    // Fetch live price data for all tokens
+    // If price data is not needed, return basic holdings immediately (FAST)
+    if (!fetchPriceData) {
+      return holdings.map((holding: any) => ({
+        ...holding,
+        currentPriceUsd: undefined,
+        currentValueUsd: undefined,
+        currentValueSol: undefined,
+        profitLossPercent: undefined,
+        priceChange5m: undefined,
+        priceChange15m: undefined,
+        priceChange24h: undefined,
+        marketCap: undefined
+      })) as TokenHolding[];
+    }
+
+    // Fetch live price data for all tokens (SLOW)
     const tokenAddresses = holdings.map((h: any) => h.tokenAddress);
 
     // Add SOL address to get SOL price for conversion

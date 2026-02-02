@@ -140,6 +140,11 @@ export class StartCallbackHandlers {
     return MenuHandlers.handleBackToMenu(ctx);
   }
 
+  // Handle refresh balances callback (refreshes tokens / wallet balances)
+  static async handleRefreshBalances(ctx: Context): Promise<void> {
+    return MenuHandlers.handleRefreshBalances(ctx);
+  }
+
   // Handle back to group menu callback
   static async handleBackToGroupMenu(ctx: Context): Promise<void> {
     return MenuHandlers.handleBackToGroupMenu(ctx);

@@ -110,6 +110,7 @@ export class CommandManager {
     this.bot.action("show_help", StartCallbackHandlers.handleShowHelp);
     this.bot.action("show_about", StartCallbackHandlers.handleShowAbout);
     this.bot.action("back_to_menu", StartCallbackHandlers.handleBackToMenu);
+    this.bot.action("refresh_balances", StartCallbackHandlers.handleRefreshBalances);
     this.bot.action(
       "back_to_group_menu",
       StartCallbackHandlers.handleBackToGroupMenu
