@@ -647,17 +647,19 @@ Please submit the transaction now.`;
       }
       // FLOW B: BANK TRANSFER (VIA YARA)
       else {
-        console.log(`[Silent Transfer] Bank transfer via Yara`);
+        console.log(`[Silent Transfer] Bank transfer via Yara with data: ${JSON.stringify(data)}`);
 
         const bankName = data.bankName || data.bank_name;
         const yaraBankCode = findYaraBankCode(bankName);
 
         if (!yaraBankCode) {
+          console.log(`[Silent Transfer] Bank "${bankName}" not supported`);
           return { success: false, error: `Bank "${bankName}" not supported`, recipient: recipientName };
         }
 
         const widget = config.paymentWidgetUrl;
         if (!widget) {
+          console.log("payment widget not configured")
           return { success: false, error: "Payment widget URL not configured", recipient: recipientName };
         }
 
@@ -666,7 +668,7 @@ Please submit the transaction now.`;
           sender: {},
           recipient: {
             firstName: user.telegram_id.toString(),
-            lastName: user.username,
+            lastName: user.username || "user",
             email: "dev.czdamian@gmail.com",
             phoneNumber: "+2348060864466",
             bankAccount: {
@@ -695,9 +697,10 @@ Please submit the transaction now.`;
           },
           body: JSON.stringify(paymentOptions),
         });
+        console.log("payment widget response: ", getPaymentWidget)
 
         if (!getPaymentWidget.ok) {
-          const errorText = await getPaymentWidget.text();
+          console.log("payment widget error: ", getPaymentWidget)
           return {
             success: false,
             error: `Payment widget error: ${getPaymentWidget.status}`,
@@ -706,8 +709,10 @@ Please submit the transaction now.`;
         }
 
         const paymentWidget = await getPaymentWidget.json();
+        console.log("payment widget response: ", paymentWidget)
 
         if (paymentWidget.error) {
+          console.log("payment widget error: ", paymentWidget)
           return { success: false, error: paymentWidget.error, recipient: recipientName };
         }
 

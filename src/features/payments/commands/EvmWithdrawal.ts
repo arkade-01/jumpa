@@ -7,7 +7,8 @@ import { decryptPrivateKey } from '@shared/utils/encryption';
 // RPC URLs for supported chains
 const CHAIN_RPC_URLS = {
   CELO: 'https://forno.celo.org',
-  BASE: 'https://base-rpc.publicnode.com',
+  BASE: config.alchemyBaseMainnetRpc,
+  // BASE: 'https://base-rpc.publicnode.com',
   OPTIMISM: 'https://mainnet.optimism.io',
   POLYGON: 'https://polygon-rpc.com',
   ARBITRUM: 'https://arb1.arbitrum.io/rpc'

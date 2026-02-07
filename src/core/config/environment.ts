@@ -21,5 +21,6 @@ export const config = {
   switchSandboxKey: process.env.SWITCH_SANDBOX_KEY || "",
   usdcAddress: process.env.USDC_ADDRESS || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
   usdtAddress: process.env.USDT_ADDRESS || "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+  alchemyBaseMainnetRpc: process.env.ALCHEMY_BASE_MAINNET_RPC || "",
 
 };

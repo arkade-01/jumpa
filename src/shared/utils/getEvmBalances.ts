@@ -1,10 +1,11 @@
 import { ethers } from 'ethers';
 import User from "@core/database/models/user";
+import { config } from '@src/core/config/environment';
 
 // RPC URLs for supported chains
 const CHAIN_RPC_URLS = {
   CELO: 'https://forno.celo.org',
-  BASE: 'https://base-rpc.publicnode.com',
+  BASE: config.alchemyBaseMainnetRpc,
 };
 
 // Token contract addresses
