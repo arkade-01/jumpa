@@ -10,7 +10,6 @@ import {
 import {
   getAssociatedTokenAddress,
   createTransferInstruction,
-  getMint,
   createAssociatedTokenAccountInstruction,
   getAccount
 } from '@solana/spl-token';
@@ -23,6 +22,9 @@ const connection = new Connection(config.solMainnet, 'confirmed');
 // Token mint addresses on Solana mainnet
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 const USDT_MINT = new PublicKey('Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB');
+
+const USDC_DECIMALS = 6;
+const USDT_DECIMALS = 6;
 
 /**
  * Execute SOL transfer (pure function - no UI interactions)
@@ -161,16 +163,15 @@ export async function executeUSDCTransfer(user: any, toAddress: string, amount: 
       toPublicKey
     );
 
-    // 4. Get mint info for decimals
-    const mintInfo = await getMint(connection, USDC_MINT);
-    const amountInSmallestUnit = amount * Math.pow(10, mintInfo.decimals);
+    // 4. Get mint info for decimals (hardcoded to avoid rate limits)
+    const amountInSmallestUnit = amount * Math.pow(10, USDC_DECIMALS);
 
-    console.log(`[USDC Transfer] Decimals: ${mintInfo.decimals}`);
+    console.log(`[USDC Transfer] Decimals: ${USDC_DECIMALS}`);
     console.log(`[USDC Transfer] Amount in smallest unit: ${amountInSmallestUnit}`);
 
     // 5. Check sender's balance
     const fromAccount = await connection.getTokenAccountBalance(fromTokenAccount);
-    const balance = parseFloat(fromAccount.value.amount) / Math.pow(10, mintInfo.decimals);
+    const balance = parseFloat(fromAccount.value.amount) / Math.pow(10, USDC_DECIMALS);
 
     console.log(`[USDC Transfer] Balance: ${balance} USDC`);
 
@@ -285,16 +286,15 @@ export async function executeUSDTTransfer(user: any, toAddress: string, amount: 
       toPublicKey
     );
 
-    // 4. Get mint info for decimals
-    const mintInfo = await getMint(connection, USDT_MINT);
-    const amountInSmallestUnit = amount * Math.pow(10, mintInfo.decimals);
+    // 4. Get mint info for decimals (hardcoded to avoid rate limits)
+    const amountInSmallestUnit = amount * Math.pow(10, USDT_DECIMALS);
 
-    console.log(`[USDT Transfer] Decimals: ${mintInfo.decimals}`);
+    console.log(`[USDT Transfer] Decimals: ${USDT_DECIMALS}`);
     console.log(`[USDT Transfer] Amount in smallest unit: ${amountInSmallestUnit}`);
 
     // 5. Check sender's balance
     const fromAccount = await connection.getTokenAccountBalance(fromTokenAccount);
-    const balance = parseFloat(fromAccount.value.amount) / Math.pow(10, mintInfo.decimals);
+    const balance = parseFloat(fromAccount.value.amount) / Math.pow(10, USDT_DECIMALS);
 
     console.log(`[USDT Transfer] Balance: ${balance} USDT`);
 

@@ -774,7 +774,7 @@ Please submit the transaction now.`;
       console.error("[Silent Transfer] Error:", error);
       return {
         success: false,
-        error: error.message,
+        error: "Failed to process transaction. Please retry in a few minutes or contact support.",
         recipient: data.accountName || data.wallet_address || "unknown"
       };
     }
